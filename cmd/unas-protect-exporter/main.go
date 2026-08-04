@@ -3,6 +3,7 @@
 package main
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 	"os"
@@ -22,6 +23,11 @@ var version = "dev"
 
 func main() {
 	cfg, err := config.Parse(os.Args[1:], os.Getenv)
+	if errors.Is(err, config.ErrHelpRequested) {
+		// kingpin already wrote the usage text; --help is success, not a
+		// configuration error, so this exits 0 like any conventional CLI.
+		os.Exit(0)
+	}
 	if err != nil {
 		slog.Error("configuration error", "err", err)
 		os.Exit(1)

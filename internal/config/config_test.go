@@ -1,6 +1,9 @@
 package config
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 func envFrom(m map[string]string) func(string) string {
 	return func(k string) string { return m[k] }
@@ -74,5 +77,34 @@ func TestMissingAPIKeyIsAnError(t *testing.T) {
 	// and emit success=0 forever.
 	if _, err := Parse(nil, envFrom(map[string]string{"UNAS_URL": "https://x.example.com"})); err == nil {
 		t.Fatal("expected an error for a UNAS URL with no API key")
+	}
+}
+
+func TestHelpReturnsDistinctSentinel(t *testing.T) {
+	// --help must be distinguishable from both a real configuration error and
+	// a clean, empty configuration: main() exits 0 for this one and 1 for
+	// every other Parse error, including "no collectors enabled", which is
+	// otherwise indistinguishable from --help once kingpin's own os.Exit is
+	// disabled (see ErrHelpRequested's doc comment).
+	cfg, err := Parse([]string{"--help"}, envFrom(nil))
+	if cfg != nil {
+		t.Errorf("cfg = %+v, want nil on --help", cfg)
+	}
+	if !errors.Is(err, ErrHelpRequested) {
+		t.Fatalf("err = %v, want ErrHelpRequested", err)
+	}
+}
+
+func TestNoFlagsIsAnOrdinaryErrorNotHelp(t *testing.T) {
+	// The counterpart to TestHelpReturnsDistinctSentinel: an empty command
+	// line with nothing configured must NOT be mistaken for --help. Parse
+	// itself returns a zero-value Config with no error here (neither
+	// collector's URL is set, so neither credential check fires); it is
+	// cmd/unas-protect-exporter's "no collectors enabled" check, one layer up,
+	// that turns this into a fatal error. This test just pins that Parse does
+	// not itself return ErrHelpRequested for a plain empty invocation.
+	_, err := Parse(nil, envFrom(nil))
+	if errors.Is(err, ErrHelpRequested) {
+		t.Fatal("an empty command line must not be reported as --help")
 	}
 }

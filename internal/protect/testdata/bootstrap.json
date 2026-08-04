@@ -203,7 +203,7 @@
     ],
     "isBidirectional": true
    },
-   "bridge": "fixture-bri-u6-lite",
+   "bridge": "fixture-bridge-2",
    "leakSettings": {
     "isInternalEnabled": false,
     "isExternalEnabled": false
@@ -227,7 +227,7 @@
    "isAdopted": true,
    "upSince": 1762106578015,
    "mac": "000000000030",
-   "id": "fixture-bri-basementap"
+   "id": "fixture-bridge-1"
   },
   {
    "name": "Example Bridge 2",
@@ -239,7 +239,7 @@
    "isAdopted": true,
    "upSince": 1782464562050,
    "mac": "000000000031",
-   "id": "fixture-bri-u6-lite"
+   "id": "fixture-bridge-2"
   }
  ]
 }

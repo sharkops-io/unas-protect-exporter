@@ -3,6 +3,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -11,6 +12,25 @@ import (
 	"gitlab.com/sharkops/exporters/unas-protect-exporter/internal/protect"
 	"gitlab.com/sharkops/exporters/unas-protect-exporter/internal/unas"
 )
+
+// ErrHelpRequested is returned by Parse when the user passed --help. It is
+// not a configuration error — kingpin has already written the usage text to
+// its usage writer — so a caller must check for it with errors.Is and exit 0,
+// rather than treating it like every other Parse error (which means "print
+// this and exit 1").
+//
+// This exists because Parse calls app.Terminate(nil): kingpin's own
+// os.Exit(0)-on-help behavior is disabled on purpose, so that Parse stays
+// callable from a test without ending the test binary's process. With
+// terminate turned into a no-op, kingpin's Parse falls through --help
+// exactly like an empty command line and returns a zero-value Config with a
+// nil error — indistinguishable, to a caller, from "the user ran this with
+// no flags at all", which cmd/unas-protect-exporter's "no collectors
+// enabled" check correctly treats as a fatal misconfiguration. That check is
+// load-bearing (an exporter with nothing configured must fail loudly rather
+// than serve an empty /metrics forever), so it cannot simply be relaxed;
+// --help needs its own, distinct signal instead.
+var ErrHelpRequested = errors.New("help requested")
 
 type Config struct {
 	ListenAddress string
@@ -31,6 +51,11 @@ type Config struct {
 func Parse(args []string, getenv func(string) string) (*Config, error) {
 	app := kingpin.New("unas-protect-exporter", "Prometheus exporter for UniFi UNAS and UniFi Protect.")
 	app.Terminate(nil)
+
+	// Track --help explicitly (see ErrHelpRequested) rather than relying on
+	// kingpin's own exit behavior, which is disabled above.
+	var helpRequested bool
+	app.HelpFlag.IsSetByUser(&helpRequested)
 
 	var cfg Config
 
@@ -55,6 +80,9 @@ func Parse(args []string, getenv func(string) string) (*Config, error) {
 
 	if _, err := app.Parse(args); err != nil {
 		return nil, err
+	}
+	if helpRequested {
+		return nil, ErrHelpRequested
 	}
 
 	// Environment fallback: applied only where the flag left the value empty,

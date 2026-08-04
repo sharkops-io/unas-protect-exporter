@@ -1334,7 +1334,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "increase(promhttp_metric_handler_errors_total{job=\"unas-protect-exporter\",cause=\"gathering\"}[5m])",
+          "expr": "sum(increase(promhttp_metric_handler_errors_total{job=\"unas-protect-exporter\",cause=\"gathering\"}[5m]))",
           "legendFormat": "gathering",
           "refId": "A"
         }
@@ -1389,7 +1389,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(promhttp_metric_handler_requests_total{job=\"unas-protect-exporter\"}[5m])",
+          "expr": "sum by (code) (rate(promhttp_metric_handler_requests_total{job=\"unas-protect-exporter\"}[5m]))",
           "legendFormat": "{{code}}",
           "refId": "A"
         }
@@ -1443,7 +1443,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "go_goroutines{job=\"unas-protect-exporter\"}",
+          "expr": "max(go_goroutines{job=\"unas-protect-exporter\"})",
           "legendFormat": "goroutines",
           "refId": "A"
         }
@@ -1497,7 +1497,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "go_memstats_alloc_bytes{job=\"unas-protect-exporter\"}",
+          "expr": "max(go_memstats_alloc_bytes{job=\"unas-protect-exporter\"})",
           "legendFormat": "alloc",
           "refId": "A"
         }
@@ -1551,7 +1551,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "process_resident_memory_bytes{job=\"unas-protect-exporter\"}",
+          "expr": "max(process_resident_memory_bytes{job=\"unas-protect-exporter\"})",
           "legendFormat": "rss",
           "refId": "A"
         }
@@ -1605,7 +1605,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(process_cpu_seconds_total{job=\"unas-protect-exporter\"}[5m])",
+          "expr": "sum(rate(process_cpu_seconds_total{job=\"unas-protect-exporter\"}[5m]))",
           "legendFormat": "cpu",
           "refId": "A"
         }

@@ -188,12 +188,14 @@ against it:
 - `go_*` and `process_*` — the standard Go runtime and process collectors,
   registered by default. Drop them with a `metric_relabel_configs` action if
   you do not want them.
-- `promhttp_*` — in particular
-  `promhttp_metric_handler_errors_total{cause="gathering"}`. This exporter
-  serves partial results rather than failing a whole scrape (see below), so
-  that counter is how a gather error becomes visible at all. A non-zero
-  `increase()` on it means some series were dropped from a response that
-  otherwise looked fine; it is worth an alert.
+- `promhttp_*` — the handler is wrapped in `promhttp.InstrumentMetricHandler`,
+  so this includes `promhttp_metric_handler_requests_total` (by HTTP status
+  `code`) and `promhttp_metric_handler_requests_in_flight`, in addition to
+  `promhttp_metric_handler_errors_total{cause="gathering"}`. That last one is
+  the important one: this exporter serves partial results rather than failing
+  a whole scrape (see below), so it is how a gather error becomes visible at
+  all. A non-zero `increase()` on it means some series were dropped from a
+  response that otherwise looked fine; it is worth an alert.
 
 A field that is null on the source device is **omitted from the sample**,
 never emitted as zero — most visibly the `*_timestamp_seconds` "last event"
@@ -263,6 +265,16 @@ Downstream Kubernetes deployments (Grafana sidecar ConfigMaps,
 `additionalPrometheusRulesMap` entries, etc.) vendor copies of these files.
 If you change a panel or an alert here, update it here first — a downstream
 copy that drifts from this repo has no such CI check protecting it.
+
+Both dashboards ship a collapsed **Exporter Health** row (off by default, like
+the rest of this project's per-collector series — it is diagnostics, not
+health-at-a-glance) covering the exporter's own signals rather than the
+device's: `*_scrape_collector_success` / `*_scrape_collector_duration_seconds`,
+`promhttp_metric_handler_errors_total{cause="gathering"}` and
+`promhttp_metric_handler_requests_total`, plus goroutines, Go heap, RSS and
+CPU. Its queries match on `job="unas-protect-exporter"`, not a `pod=` string —
+the Deployment name this exporter is typically installed under is doubled
+(`unas-protect-exporter-unas-protect-exporter`) while the job label is not.
 
 ## Building
 

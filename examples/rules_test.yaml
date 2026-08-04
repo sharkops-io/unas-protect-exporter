@@ -1,0 +1,273 @@
+rule_files:
+  - rules.yaml
+
+evaluation_interval: 1m
+
+tests:
+  # --- UNASDiskOverheating: for 30m, threshold 55 ---
+  - interval: 1m
+    input_series:
+      - series: 'unas_disk_temperature_celsius{slot="1",serial="REDACTED1"}'
+        values: '45+0x40'          # 45 °C throughout: normal idle temperature
+    alert_rule_test:
+      - eval_time: 35m
+        alertname: UNASDiskOverheating
+        exp_alerts: []
+
+  - interval: 1m
+    input_series:
+      - series: 'unas_disk_temperature_celsius{slot="1",serial="REDACTED1"}'
+        values: '62+0x40'          # above 55 for the whole window
+    alert_rule_test:
+      - eval_time: 20m             # still inside for: 30m — must NOT fire yet
+        alertname: UNASDiskOverheating
+        exp_alerts: []
+      - eval_time: 35m
+        alertname: UNASDiskOverheating
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              slot: "1"
+              serial: REDACTED1
+            exp_annotations:
+              summary: "UNAS disk in slot 1 running hot"
+              description: "Disk REDACTED1 in slot 1 has been above 55 °C for 30m."
+
+  # --- UNASDiskNotOptimal: for 5m ---
+  - interval: 1m
+    input_series:
+      - series: 'unas_disk_state{slot="1",serial="REDACTED1",state="optimal"}'
+        values: '1+0x10'
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: UNASDiskNotOptimal
+        exp_alerts: []
+
+  - interval: 1m
+    input_series:
+      - series: 'unas_disk_state{slot="1",serial="REDACTED1",state="degraded"}'
+        values: '1+0x10'
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: UNASDiskNotOptimal
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              slot: "1"
+              serial: REDACTED1
+              state: degraded
+            exp_annotations:
+              summary: "UNAS disk in slot 1 is not optimal"
+              description: 'Disk REDACTED1 in slot 1 reports state "degraded" (expected "optimal").'
+
+  # --- UNASDiskHealthDegraded: for 10m, threshold < 5 ---
+  - interval: 1m
+    input_series:
+      - series: 'unas_disk_health_score{slot="1",serial="REDACTED1",model="EXAMPLE-16TB",type="HDD"}'
+        values: '5+0x15'
+    alert_rule_test:
+      - eval_time: 12m
+        alertname: UNASDiskHealthDegraded
+        exp_alerts: []
+
+  - interval: 1m
+    input_series:
+      - series: 'unas_disk_health_score{slot="1",serial="REDACTED1",model="EXAMPLE-16TB",type="HDD"}'
+        values: '4+0x15'
+    alert_rule_test:
+      - eval_time: 12m
+        alertname: UNASDiskHealthDegraded
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              slot: "1"
+              serial: REDACTED1
+              model: EXAMPLE-16TB
+              type: HDD
+            exp_annotations:
+              summary: "UNAS disk in slot 1 health degraded"
+              description: "Disk REDACTED1 in slot 1 reports health 4/5."
+
+  # --- UNASDiskUncorrectableSectors: increase() over 24h, no for: ---
+  # A flat counter must NOT fire. This is the case that matters: slot 6 on the
+  # real device carries a pre-existing uncorrectable sector, and a naive
+  # "> 0" on the raw counter would alert on it forever.
+  - interval: 5m
+    input_series:
+      - series: 'unas_disk_uncorrectable_sector_count_total{slot="6",serial="REDACTED2"}'
+        values: '1+0x300'
+    alert_rule_test:
+      - eval_time: 24h
+        alertname: UNASDiskUncorrectableSectors
+        exp_alerts: []
+
+  - interval: 5m
+    input_series:
+      - series: 'unas_disk_uncorrectable_sector_count_total{slot="6",serial="REDACTED2"}'
+        values: '1+0x150 2+0x150'   # one new sector partway through the window
+    alert_rule_test:
+      - eval_time: 24h
+        alertname: UNASDiskUncorrectableSectors
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              slot: "6"
+              serial: REDACTED2
+            exp_annotations:
+              summary: "UNAS disk in slot 6 gained an uncorrectable sector"
+              description: "Disk REDACTED2 in slot 6 reported new uncorrectable sectors in the last 24h."
+
+  # --- UNASDiskBadSectors: same shape, different counter ---
+  - interval: 5m
+    input_series:
+      - series: 'unas_disk_bad_sector_count_total{slot="1",serial="REDACTED1"}'
+        values: '0+0x300'
+    alert_rule_test:
+      - eval_time: 24h
+        alertname: UNASDiskBadSectors
+        exp_alerts: []
+
+  - interval: 5m
+    input_series:
+      - series: 'unas_disk_bad_sector_count_total{slot="1",serial="REDACTED1"}'
+        values: '0+0x150 1+0x150'
+    alert_rule_test:
+      - eval_time: 24h
+        alertname: UNASDiskBadSectors
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              slot: "1"
+              serial: REDACTED1
+            exp_annotations:
+              summary: "UNAS disk in slot 1 gained a bad sector"
+              description: "Disk REDACTED1 in slot 1 reported new bad sectors in the last 24h."
+
+  # --- UNASPoolUnhealthy: for 5m. "scrubbing" is known-good and must not fire ---
+  - interval: 1m
+    input_series:
+      - series: 'unas_pool_status{pool="pool-uuid-1",status="scrubbing"}'
+        values: '1+0x10'
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: UNASPoolUnhealthy
+        exp_alerts: []
+
+  - interval: 1m
+    input_series:
+      - series: 'unas_pool_status{pool="pool-uuid-1",status="degraded"}'
+        values: '1+0x10'
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: UNASPoolUnhealthy
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              pool: pool-uuid-1
+              status: degraded
+            exp_annotations:
+              summary: "UNAS pool pool-uuid-1 is not healthy"
+              description: 'Pool pool-uuid-1 reports status "degraded", which is not a known-good state.'
+
+  # --- UNASPoolProtectionDegraded: for 5m ---
+  - interval: 1m
+    input_series:
+      - series: 'unas_pool_current_protection{pool="pool-uuid-1",raid_group="raid-group-1"}'
+        values: '2+0x10'
+      - series: 'unas_pool_expected_protection{pool="pool-uuid-1",raid_group="raid-group-1"}'
+        values: '2+0x10'
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: UNASPoolProtectionDegraded
+        exp_alerts: []
+
+  - interval: 1m
+    input_series:
+      - series: 'unas_pool_current_protection{pool="pool-uuid-1",raid_group="raid-group-1"}'
+        values: '1+0x10'
+      - series: 'unas_pool_expected_protection{pool="pool-uuid-1",raid_group="raid-group-1"}'
+        values: '2+0x10'
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: UNASPoolProtectionDegraded
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              pool: pool-uuid-1
+              raid_group: raid-group-1
+            exp_annotations:
+              summary: "UNAS pool pool-uuid-1 has lost redundancy"
+              description: "RAID group raid-group-1 can absorb 1 more disk failure(s), fewer than configured."
+
+  # --- UNASPoolFillingUp / UNASPoolAlmostFull: 0.85 for 1h, 0.95 for 30m ---
+  - interval: 5m
+    input_series:
+      - series: 'unas_pool_used_bytes{pool="pool-uuid-1"}'
+        values: '800+0x20'
+      - series: 'unas_pool_capacity_bytes{pool="pool-uuid-1"}'
+        values: '1000+0x20'        # 80%: below both thresholds
+    alert_rule_test:
+      - eval_time: 90m
+        alertname: UNASPoolFillingUp
+        exp_alerts: []
+      - eval_time: 90m
+        alertname: UNASPoolAlmostFull
+        exp_alerts: []
+
+  - interval: 5m
+    input_series:
+      - series: 'unas_pool_used_bytes{pool="pool-uuid-1"}'
+        values: '900+0x20'
+      - series: 'unas_pool_capacity_bytes{pool="pool-uuid-1"}'
+        values: '1000+0x20'        # 90%: warning only, not critical
+    alert_rule_test:
+      - eval_time: 90m
+        alertname: UNASPoolFillingUp
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              pool: pool-uuid-1
+            exp_annotations:
+              summary: "UNAS pool pool-uuid-1 is filling up"
+              description: "Pool pool-uuid-1 is 90% full, above the 85% warning threshold."
+      - eval_time: 90m
+        alertname: UNASPoolAlmostFull
+        exp_alerts: []
+
+  # --- Collector backstops: for 15m ---
+  - interval: 1m
+    input_series:
+      - series: 'unas_scrape_collector_success'
+        values: '1+0x20'
+    alert_rule_test:
+      - eval_time: 18m
+        alertname: UNASCollectorFailing
+        exp_alerts: []
+
+  - interval: 1m
+    input_series:
+      - series: 'unas_scrape_collector_success'
+        values: '0+0x20'
+    alert_rule_test:
+      - eval_time: 18m
+        alertname: UNASCollectorFailing
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "UNAS metrics collection is failing"
+              description: "The UNAS collector has failed every scrape for 15m; all unas_* series are stale or absent."
+
+  - interval: 1m
+    input_series:
+      - series: 'protect_scrape_collector_success'
+        values: '0+0x20'
+    alert_rule_test:
+      - eval_time: 18m
+        alertname: ProtectCollectorFailing
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "Protect metrics collection is failing"
+              description: "The Protect collector has failed every scrape for 15m; all protect_* series are stale or absent."

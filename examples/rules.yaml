@@ -1,0 +1,107 @@
+groups:
+  - name: unas-disks
+    rules:
+      - alert: UNASDiskNotOptimal
+        expr: unas_disk_state{state!="optimal"} == 1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "UNAS disk in slot {{ $labels.slot }} is not optimal"
+          description: 'Disk {{ $labels.serial }} in slot {{ $labels.slot }} reports state "{{ $labels.state }}" (expected "optimal").'
+
+      - alert: UNASDiskHealthDegraded
+        expr: unas_disk_health_score < 5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "UNAS disk in slot {{ $labels.slot }} health degraded"
+          description: "Disk {{ $labels.serial }} in slot {{ $labels.slot }} reports health {{ $value }}/5."
+
+      # increase() over 24h, so these fire on NEW sectors only. A disk carrying a
+      # pre-existing uncorrectable sector must not alert forever.
+      - alert: UNASDiskUncorrectableSectors
+        expr: increase(unas_disk_uncorrectable_sector_count_total[24h]) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "UNAS disk in slot {{ $labels.slot }} gained an uncorrectable sector"
+          description: "Disk {{ $labels.serial }} in slot {{ $labels.slot }} reported new uncorrectable sectors in the last 24h."
+
+      - alert: UNASDiskBadSectors
+        expr: increase(unas_disk_bad_sector_count_total[24h]) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "UNAS disk in slot {{ $labels.slot }} gained a bad sector"
+          description: "Disk {{ $labels.serial }} in slot {{ $labels.slot }} reported new bad sectors in the last 24h."
+
+      - alert: UNASDiskOverheating
+        expr: unas_disk_temperature_celsius > 55
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "UNAS disk in slot {{ $labels.slot }} running hot"
+          description: "Disk {{ $labels.serial }} in slot {{ $labels.slot }} has been above 55 °C for 30m."
+
+  - name: unas-pools
+    rules:
+      - alert: UNASPoolUnhealthy
+        expr: unas_pool_status{status!~"optimal|healthy|ok|fullyOperational|active|normal|scrubbing"} == 1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "UNAS pool {{ $labels.pool }} is not healthy"
+          description: 'Pool {{ $labels.pool }} reports status "{{ $labels.status }}", which is not a known-good state.'
+
+      - alert: UNASPoolProtectionDegraded
+        expr: unas_pool_current_protection < unas_pool_expected_protection
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "UNAS pool {{ $labels.pool }} has lost redundancy"
+          description: "RAID group {{ $labels.raid_group }} can absorb {{ $value }} more disk failure(s), fewer than configured."
+
+      - alert: UNASPoolFillingUp
+        expr: unas_pool_used_bytes / unas_pool_capacity_bytes > 0.85
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "UNAS pool {{ $labels.pool }} is filling up"
+          description: "Pool {{ $labels.pool }} is {{ $value | humanizePercentage }} full, above the 85% warning threshold."
+
+      - alert: UNASPoolAlmostFull
+        expr: unas_pool_used_bytes / unas_pool_capacity_bytes > 0.95
+        for: 30m
+        labels:
+          severity: critical
+        annotations:
+          summary: "UNAS pool {{ $labels.pool }} is almost full"
+          description: "Pool {{ $labels.pool }} is {{ $value | humanizePercentage }} full, above the 95% critical threshold."
+
+  - name: exporter-health
+    rules:
+      # The backstop. An unreachable device produces ABSENT series, not a series
+      # reading zero, so no per-subject rule above can see that case. This one can.
+      - alert: UNASCollectorFailing
+        expr: unas_scrape_collector_success == 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "UNAS metrics collection is failing"
+          description: "The UNAS collector has failed every scrape for 15m; all unas_* series are stale or absent."
+
+      - alert: ProtectCollectorFailing
+        expr: protect_scrape_collector_success == 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Protect metrics collection is failing"
+          description: "The Protect collector has failed every scrape for 15m; all protect_* series are stale or absent."

@@ -114,14 +114,27 @@ func TestSamplesOmitsDeviceBlockWithoutDeviceInfo(t *testing.T) {
 	st := testStorage()
 	st.HasDeviceInfo = false
 
+	samples := Samples(st, "fallback", time.Now())
+	if len(samples) == 0 {
+		t.Fatal("Samples returned nothing; the absence checks below would pass vacuously")
+	}
+
 	// A best-effort device-info failure must publish NOTHING device-level rather
 	// than a 0 degC CPU and an empty unas_info, which Prometheus would never correct.
-	for _, s := range Samples(st, "fallback", time.Now()) {
+	var sawDiskSeries bool
+	for _, s := range samples {
 		switch s.Name {
 		case "unas_cpu_load_ratio", "unas_cpu_temperature_celsius", "unas_memory_total_bytes",
 			"unas_memory_available_bytes", "unas_info", "unas_uptime_seconds":
 			t.Errorf("device-level series %q published without device info", s.Name)
+		case "unas_disk_temperature_celsius":
+			sawDiskSeries = true
 		}
+	}
+	// Disks must survive a missing device-info fetch: only the device block is
+	// best-effort, so an empty result here would mean the guard over-corrected.
+	if !sawDiskSeries {
+		t.Error("unas_disk_temperature_celsius was not emitted; disks should survive missing device info")
 	}
 }
 
@@ -129,18 +142,32 @@ func TestSamplesUsesDeviceNameFallback(t *testing.T) {
 	st := testStorage()
 	st.DeviceInfo.Name = ""
 
+	var found bool
 	for _, s := range Samples(st, "fallback-name", time.Now()) {
-		if s.Name == "unas_cpu_load_ratio" && s.Labels["device"] != "fallback-name" {
-			t.Errorf("device label = %q, want the fallback", s.Labels["device"])
+		if s.Name == "unas_cpu_load_ratio" {
+			found = true
+			if s.Labels["device"] != "fallback-name" {
+				t.Errorf("device label = %q, want the fallback", s.Labels["device"])
+			}
 		}
+	}
+	// Without this, the loop above matches nothing and the test passes
+	// vacuously if unas_cpu_load_ratio is ever dropped entirely.
+	if !found {
+		t.Fatal("unas_cpu_load_ratio was not emitted at all")
 	}
 }
 
 func TestSamplesOmitsUptimeWithoutStartupTime(t *testing.T) {
 	st := testStorage() // StartupTime left zero
 
+	samples := Samples(st, "fallback", time.Now())
+	if len(samples) == 0 {
+		t.Fatal("Samples returned nothing; the absence check below would pass vacuously")
+	}
+
 	// An unparseable startupTime would otherwise read as a 56-year uptime.
-	for _, s := range Samples(st, "fallback", time.Now()) {
+	for _, s := range samples {
 		if s.Name == "unas_uptime_seconds" {
 			t.Fatal("uptime published without a startup time")
 		}

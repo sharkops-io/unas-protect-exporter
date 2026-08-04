@@ -33,7 +33,11 @@ func (f *fakeSource) Collect(ctx context.Context) ([]metric.Sample, error) {
 		}
 	}
 	if f.err != nil {
-		return nil, f.err
+		// Return samples alongside the error, not nil — so a test that
+		// asserts retraction is exercising the Collector's own "samples =
+		// nil on error" defense, not merely observing that this fixture
+		// never handed back anything to retract in the first place.
+		return f.samples, f.err
 	}
 	return f.samples, nil
 }
@@ -132,30 +136,20 @@ func TestCollectRespectsTimeout(t *testing.T) {
 	close(src.block)
 }
 
-// dirtySource returns samples alongside an error, unlike fakeSource (which
-// always discards samples on its own error path). This exercises the
-// Collector's own retraction defense independent of a well-behaved Source: a
-// misbehaving Source that hands back a partial payload with an error must
-// still not leak that payload onto the wire.
-type dirtySource struct {
-	ns      string
-	samples []metric.Sample
-	err     error
-}
-
-func (d *dirtySource) Namespace() string { return d.ns }
-
-func (d *dirtySource) Collect(context.Context) ([]metric.Sample, error) {
-	return d.samples, d.err
-}
-
-func TestCollectRetractsSamplesEvenWhenSourceMisbehaves(t *testing.T) {
-	src := &dirtySource{ns: "unas", err: errors.New("partial failure"), samples: []metric.Sample{
-		metric.Gauge("unas_thing", "thing", 7, map[string]string{"id": "a"}),
+func TestCollectDropsMalformedSampleButKeepsOthers(t *testing.T) {
+	src := &fakeSource{ns: "unas", samples: []metric.Sample{
+		metric.Gauge("not a valid name", "malformed", 1, nil),
+		metric.Gauge("unas_valid_thing", "valid", 3, nil),
 	}}
 	c := New(src, time.Second)
 
-	if n := testutil.CollectAndCount(c, "unas_thing"); n != 0 {
-		t.Errorf("device series published even though the source returned an error alongside samples: %d", n)
+	// One malformed series must not fail the whole gather, which would take
+	// every other metric on the endpoint with it — including the valid
+	// sample collected alongside it and the self-monitoring series.
+	if n := testutil.CollectAndCount(c, "unas_valid_thing"); n != 1 {
+		t.Errorf("valid sample count = %d, want 1 despite a malformed sample in the same collection", n)
+	}
+	if n := testutil.CollectAndCount(c, "unas_scrape_collector_success"); n != 1 {
+		t.Errorf("success series missing after a malformed sample was dropped: %d", n)
 	}
 }

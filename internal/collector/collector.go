@@ -47,17 +47,33 @@ func New(src Source, timeout time.Duration) *Collector {
 	}
 }
 
-// Describe sends nothing, deliberately. client_golang treats a Collector as
-// "checked" the moment Describe yields even one Desc, and a checked
-// collector's pedantic registry (which is what prometheus/client_golang's
-// testutil.CollectAndCount/CollectAndCompare always register against) then
-// rejects any Collect'd metric whose descriptor wasn't pre-declared here. The
-// device series are built with NewConstMetric from payloads whose label sets
-// aren't known until collection, so they can never be pre-declared — meaning
-// declaring even the two self-monitoring descriptors here would poison the
-// whole collector as "checked" and cause every real scrape to fail gathering.
-// Sending nothing keeps this collector fully unchecked, which is the correct
-// state for one whose metric set is inherently dynamic.
+// Describe sends nothing, deliberately.
+//
+// The Collector interface's documented contract (client_golang
+// prometheus/collector.go) requires that the descriptor of every metric sent
+// from Collect be one that Describe returned — unless Describe sends no
+// descriptor at all, which marks the whole Collector "unchecked" and lifts
+// that requirement. The device series here are built with NewConstMetric
+// from payloads whose label sets aren't known until collection, so they can
+// never be enumerated by Describe up front; declaring the two
+// self-monitoring descriptors and nothing else would violate the contract
+// for every device series. A plain prometheus.NewRegistry() is lenient about
+// this and would gather successfully anyway, but every testutil.CollectAnd*
+// helper — and any real NewPedanticRegistry() — enforces it strictly, and
+// would reject those series with "unregistered descriptor" at gather time.
+// (Verified by running the two-descriptor version against this package's own
+// tests: two of five failed with exactly that error.)
+//
+// The cost of going fully unchecked: an unchecked Collector skips the
+// duplicate-descriptor check Register normally performs, so registering two
+// Collectors that happen to share a namespace would no longer panic at
+// Register time — it would instead surface later, at Gather time, as
+// "collected metric ... was collected before with the same name and label
+// values" (the label-less success/duration series would collide first).
+// Acceptable here because main registers each namespace ("unas", "protect")
+// exactly once; a future maintainer wiring up a second instance of either
+// (e.g. a second Protect NVR) should know this moved from a startup-time
+// guarantee to a scrape-time one.
 func (c *Collector) Describe(chan<- *prometheus.Desc) {}
 
 func (c *Collector) Collect(ch chan<- prometheus.Metric) {

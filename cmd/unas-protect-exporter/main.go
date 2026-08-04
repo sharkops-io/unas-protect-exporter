@@ -17,12 +17,17 @@ import (
 	"gitlab.com/sharkops/exporters/unas-protect-exporter/internal/unas"
 )
 
+// version is overridden at build time via -ldflags "-X main.version=...".
+var version = "dev"
+
 func main() {
 	cfg, err := config.Parse(os.Args[1:], os.Getenv)
 	if err != nil {
 		slog.Error("configuration error", "err", err)
 		os.Exit(1)
 	}
+
+	slog.Info("starting unas-protect-exporter", "version", version)
 
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(collectors.NewGoCollector(), collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))

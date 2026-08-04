@@ -1,0 +1,35 @@
+# Changelog
+
+All notable changes to this project are documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project follows the metric-surface compatibility contract described
+in `CONTRIBUTING.md` — a renamed or removed metric name is a breaking change.
+
+## [0.1.0] - 2026-08-04
+
+Initial release.
+
+### Added
+
+- A `unas` collector exposing UniFi UNAS storage-appliance metrics: device
+  info and health (CPU, memory, uptime), per-disk SMART data, and per-pool /
+  per-RAID-group capacity and protection state.
+- A `protect` collector exposing UniFi Protect console metrics: NVR info,
+  CPU/memory/storage/disk health, and per-device state for cameras, sensors
+  and bridges.
+- Both collectors run independently and can be enabled separately
+  (`--collector.unas`, `--collector.protect`); either can be left
+  unconfigured.
+- Per-collector self-monitoring series (`unas_scrape_collector_success`,
+  `unas_scrape_collector_duration_seconds` and the `protect_` equivalents) so
+  a device-unreachable failure is visible even though the affected `unas_*` /
+  `protect_*` series simply go absent rather than reading zero.
+- Session reuse for both UniFi OS integrations: one login per process
+  lifetime, not one per scrape.
+- Example Grafana dashboards (`dashboards/unas.json`, `dashboards/protect.json`)
+  and example Prometheus alerting rules with `promtool` unit tests
+  (`examples/rules.yaml`, `examples/rules_test.yaml`), both validated offline
+  against the metrics the mappers actually emit.
+- A generated metric reference (`internal/tools/metricdoc`) so the README's
+  metric table cannot drift from the code that produces it.

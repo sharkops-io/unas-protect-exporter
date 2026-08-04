@@ -1,0 +1,51 @@
+include:
+  - project: 'sharkops/gitlab-ci-common-config'
+    ref: master
+    file: 'docker/build.yml'
+
+# The included template's jobs (build, build_release) both declare
+# `stage: build`. It supplies no `stages:` list of its own, so this project
+# must declare one that includes every stage any included or local job uses.
+stages: [test, rules, build]
+
+variables:
+  GO_VERSION: "1.26"
+  # docker/build.yml (sharkops/gitlab-ci-common-config) builds with Kaniko —
+  # no Docker-in-Docker. It is single-arch: whatever platform the Kaniko
+  # executor itself runs on (amd64 on this org's shared runners). The
+  # multi-arch (linux/amd64,linux/arm64) buildx image this project's plan
+  # originally called for is therefore NOT produced here. That is an accepted
+  # trade for this deployment: the target cluster is amd64-only.
+  REGISTRY_URL: $CI_REGISTRY
+  REGISTRY_USER: $CI_REGISTRY_USER
+  REGISTRY_PASSWORD: $CI_REGISTRY_PASSWORD
+  IMAGE_NAME: $CI_REGISTRY_IMAGE
+
+lint:
+  stage: test
+  image: golangci/golangci-lint:latest
+  script:
+    - golangci-lint run --timeout 5m
+
+test:
+  stage: test
+  image: golang:${GO_VERSION}
+  script:
+    - go test ./... -race -count=1
+
+# promtool runs against the shipped example rules. This needs no cluster:
+# `promtool test rules` synthesises its own series.
+#
+# prom/prometheus's default ENTRYPOINT is the `prometheus` binary itself,
+# which rejects `promtool` as an unknown argument if invoked as `prometheus
+# promtool ...` — hence the entrypoint override so `script:` can call
+# `promtool` directly.
+rules:
+  stage: rules
+  image:
+    name: prom/prometheus:latest
+    entrypoint: [""]
+  script:
+    - cd examples
+    - promtool check rules rules.yaml
+    - promtool test rules rules_test.yaml

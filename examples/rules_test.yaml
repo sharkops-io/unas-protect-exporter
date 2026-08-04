@@ -234,6 +234,23 @@ tests:
         alertname: UNASPoolAlmostFull
         exp_alerts: []
 
+  - interval: 5m
+    input_series:
+      - series: 'unas_pool_used_bytes{pool="pool-uuid-1"}'
+        values: '980+0x20'
+      - series: 'unas_pool_capacity_bytes{pool="pool-uuid-1"}'
+        values: '1000+0x20'        # 98%: above both thresholds, held past for: 30m
+    alert_rule_test:
+      - eval_time: 90m
+        alertname: UNASPoolAlmostFull
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              pool: pool-uuid-1
+            exp_annotations:
+              summary: "UNAS pool pool-uuid-1 is almost full"
+              description: "Pool pool-uuid-1 is 98% full, above the 95% critical threshold."
+
   # --- Collector backstops: for 15m ---
   - interval: 1m
     input_series:
@@ -257,6 +274,15 @@ tests:
             exp_annotations:
               summary: "UNAS metrics collection is failing"
               description: "The UNAS collector has failed every scrape for 15m; all unas_* series are stale or absent."
+
+  - interval: 1m
+    input_series:
+      - series: 'protect_scrape_collector_success'
+        values: '1+0x20'
+    alert_rule_test:
+      - eval_time: 18m
+        alertname: ProtectCollectorFailing
+        exp_alerts: []
 
   - interval: 1m
     input_series:

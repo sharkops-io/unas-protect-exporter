@@ -8,6 +8,22 @@ in `CONTRIBUTING.md` — a renamed or removed metric name is a breaking change.
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-08-04
+
+### Fixed
+
+- The six new "Exporter Health" panels added in 0.1.1
+  (`promhttp_metric_handler_errors_total`, `promhttp_metric_handler_requests_total`,
+  `go_goroutines`, `go_memstats_alloc_bytes`, `process_resident_memory_bytes`,
+  `process_cpu_seconds_total`) queried their metric with no aggregation, so
+  each panel leaked the ServiceMonitor's own scrape labels (`pod`,
+  `container`, `endpoint`, `instance`) into the legend instead of rendering
+  the single series these panels are meant to show. `monitoring`'s
+  `verify-dashboards.sh`, which runs range queries against a live
+  Prometheus rather than trusting the JSON alone, caught it before it
+  shipped. Wrapped each in `max(...)` or `sum(...)`/`sum by (code) (...)`
+  as appropriate; no metric, label or panel title changed.
+
 ## [0.1.1] - 2026-08-04
 
 ### Added

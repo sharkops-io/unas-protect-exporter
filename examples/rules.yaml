@@ -86,8 +86,15 @@ groups:
 
   - name: exporter-health
     rules:
-      # The backstop. An unreachable device produces ABSENT series, not a series
-      # reading zero, so no per-subject rule above can see that case. This one can.
+      # These two catch ONE failure mode: a collector that is registered and
+      # running but cannot reach its device. That produces absent unas_*/protect_*
+      # series rather than series reading zero, so no per-subject rule above can
+      # see it — but the collector itself is still there to report success == 0.
+      #
+      # They do NOT catch a collector that never registered, nor one that
+      # scrapes successfully and returns nothing useful. Those two are covered
+      # by the absent() rules further down, which exist precisely because
+      # success == 0 is not the only way this can be broken.
       - alert: UNASCollectorFailing
         expr: unas_scrape_collector_success == 0
         for: 15m
@@ -105,3 +112,64 @@ groups:
         annotations:
           summary: "Protect metrics collection is failing"
           description: "The Protect collector has failed every scrape for 15m; all protect_* series are stale or absent."
+
+  # absent() backstops. Everything above needs a series to evaluate; these are
+  # the rules for when the series that would have alerted is simply not there.
+  #
+  # ADOPTERS: delete the pair for a collector you deliberately do not run. An
+  # exporter configured with only --protect.url never emits unas_* at all, and
+  # UNASCollectorAbsent would then fire forever.
+  - name: exporter-absent
+    rules:
+      # A collector that never REGISTERED — a typo'd secret key, an env var
+      # that was never mounted, --collector.unas=false left in a values file —
+      # makes unas_scrape_collector_success absent rather than 0. UNASCollectorFailing
+      # matches on `== 0` and therefore can never fire for it: the exporter is
+      # up, the scrape target is green, and there is simply no UNAS data at all.
+      - alert: UNASCollectorAbsent
+        expr: absent(unas_scrape_collector_success)
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "UNAS collector is not registered"
+          description: "unas_scrape_collector_success has been absent for 15m: the UNAS collector is not running at all (check --unas.url / UNAS_API_KEY), rather than running and failing."
+
+      - alert: ProtectCollectorAbsent
+        expr: absent(protect_scrape_collector_success)
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Protect collector is not registered"
+          description: "protect_scrape_collector_success has been absent for 15m: the Protect collector is not running at all (check --protect.url / PROTECT_USERNAME / PROTECT_PASSWORD), rather than running and failing."
+
+      # Series-level backstops for the nastiest case of all: a collector
+      # reporting success == 1 while producing WRONG data. A UniFi firmware
+      # update that renames a payload key (`disks` -> `drives`, say) still
+      # decodes cleanly into zero-valued structs — err is nil, success is 1,
+      # and every disk and pool series silently disappears. Nothing else in
+      # this file notices, because every other rule needs those series to
+      # evaluate at all.
+      #
+      # The `and on() ... == 1` is what separates this from the collector rules
+      # above: it fires only while the collector claims to be healthy. A
+      # genuinely failing or unregistered collector is already covered, and
+      # would otherwise page twice for one fault.
+      - alert: UNASDiskSeriesAbsent
+        expr: absent(unas_disk_state) and on() unas_scrape_collector_success == 1
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "UNAS reports a healthy scrape but no disks"
+          description: "unas_disk_state has been absent for 15m while unas_scrape_collector_success reads 1. The collector is scraping successfully and returning no disks — most likely the device payload changed shape. Every disk alert is silently unable to fire until this is fixed."
+
+      - alert: UNASPoolSeriesAbsent
+        expr: absent(unas_pool_status) and on() unas_scrape_collector_success == 1
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "UNAS reports a healthy scrape but no pools"
+          description: "unas_pool_status has been absent for 15m while unas_scrape_collector_success reads 1. The collector is scraping successfully and returning no storage pools — most likely the device payload changed shape. Every pool alert is silently unable to fire until this is fixed."

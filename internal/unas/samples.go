@@ -62,7 +62,7 @@ func Samples(st *Storage, deviceName string, now time.Time) []metric.Sample {
 	}
 
 	// The whole device block is skipped when device-info did not arrive. Its
-	// fetch is best-effort (see GetStorageTyped), so a single transient 500
+	// fetch is best-effort (see Client.GetStorage), so a single transient 500
 	// would otherwise publish a 0 °C CPU, 0-byte total memory and an empty
 	// unas_info — permanently, since Prometheus never corrects a recorded
 	// sample. This is the same reasoning that already omits unas_uptime_seconds

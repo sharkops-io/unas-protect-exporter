@@ -27,6 +27,19 @@ Initial release.
   `protect_*` series simply go absent rather than reading zero.
 - Session reuse for both UniFi OS integrations: one login per process
   lifetime, not one per scrape.
+- Endpoint-level fault isolation: `/metrics` is served with
+  `promhttp.ContinueOnError` and each collector drops duplicate series before
+  they reach the registry, so a panic or a duplicate in one collector cannot
+  answer the whole endpoint with an empty HTTP 500. Gather failures surface on
+  `promhttp_metric_handler_errors_total{cause="gathering"}` instead.
+- `--http.timeout` (default `10s`), bounding each individual HTTP request.
+  `--collector.timeout` bounds a whole scrape and cannot on its own give a
+  slow device more time.
+- `--log.level` and `--log.format`, wired to `slog`.
+- `absent()` alert rules in `examples/rules.yaml` for the two failure modes
+  that produce wrong data with `success == 1`: a collector that never
+  registered, and a device payload that changed shape and now decodes to
+  nothing.
 - Example Grafana dashboards (`dashboards/unas.json`, `dashboards/protect.json`)
   and example Prometheus alerting rules with `promtool` unit tests
   (`examples/rules.yaml`, `examples/rules_test.yaml`), both validated offline

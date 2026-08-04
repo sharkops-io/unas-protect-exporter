@@ -297,3 +297,128 @@ tests:
             exp_annotations:
               summary: "Protect metrics collection is failing"
               description: "The Protect collector has failed every scrape for 15m; all protect_* series are stale or absent."
+
+  # --- absent() backstops: for 15m ---
+  # Each of these needs a "the series exists" side too, because an absent()
+  # rule with no such case would pass just as happily against `expr: vector(1)`.
+
+  # UNASCollectorAbsent: the collector is registered, so it must stay quiet
+  # even while it is FAILING — that case belongs to UNASCollectorFailing.
+  - interval: 1m
+    input_series:
+      - series: 'unas_scrape_collector_success'
+        values: '0+0x20'
+    alert_rule_test:
+      - eval_time: 18m
+        alertname: UNASCollectorAbsent
+        exp_alerts: []
+
+  # No unas_* series at all — the collector never registered. An unrelated
+  # series is supplied so the test has a time range to evaluate over.
+  - interval: 1m
+    input_series:
+      - series: 'protect_scrape_collector_success'
+        values: '1+0x20'
+    alert_rule_test:
+      - eval_time: 10m             # inside for: 15m — must NOT fire yet
+        alertname: UNASCollectorAbsent
+        exp_alerts: []
+      - eval_time: 18m
+        alertname: UNASCollectorAbsent
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "UNAS collector is not registered"
+              description: "unas_scrape_collector_success has been absent for 15m: the UNAS collector is not running at all (check --unas.url / UNAS_API_KEY), rather than running and failing."
+      # ... and the Protect collector, which IS present, must not alert.
+      - eval_time: 18m
+        alertname: ProtectCollectorAbsent
+        exp_alerts: []
+
+  - interval: 1m
+    input_series:
+      - series: 'unas_scrape_collector_success'
+        values: '1+0x20'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: ProtectCollectorAbsent
+        exp_alerts: []
+      - eval_time: 18m
+        alertname: ProtectCollectorAbsent
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "Protect collector is not registered"
+              description: "protect_scrape_collector_success has been absent for 15m: the Protect collector is not running at all (check --protect.url / PROTECT_USERNAME / PROTECT_PASSWORD), rather than running and failing."
+
+  # UNASDiskSeriesAbsent / UNASPoolSeriesAbsent: healthy scrape, series present.
+  - interval: 1m
+    input_series:
+      - series: 'unas_scrape_collector_success'
+        values: '1+0x20'
+      - series: 'unas_disk_state{slot="1",serial="REDACTED1",state="optimal"}'
+        values: '1+0x20'
+      - series: 'unas_pool_status{pool="pool-uuid-1",status="healthy"}'
+        values: '1+0x20'
+    alert_rule_test:
+      - eval_time: 18m
+        alertname: UNASDiskSeriesAbsent
+        exp_alerts: []
+      - eval_time: 18m
+        alertname: UNASPoolSeriesAbsent
+        exp_alerts: []
+
+  # The reshape: `disks`/`pools` renamed upstream, so both families decode to
+  # nothing while the scrape still reports success. unas_info survives with
+  # empty labels, which is exactly how this looks on a real payload change.
+  - interval: 1m
+    input_series:
+      - series: 'unas_scrape_collector_success'
+        values: '1+0x20'
+      - series: 'unas_info{device="",model="",firmware="",version=""}'
+        values: '1+0x20'
+    alert_rule_test:
+      - eval_time: 10m             # inside for: 15m
+        alertname: UNASDiskSeriesAbsent
+        exp_alerts: []
+      - eval_time: 18m
+        alertname: UNASDiskSeriesAbsent
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: "UNAS reports a healthy scrape but no disks"
+              description: "unas_disk_state has been absent for 15m while unas_scrape_collector_success reads 1. The collector is scraping successfully and returning no disks — most likely the device payload changed shape. Every disk alert is silently unable to fire until this is fixed."
+      - eval_time: 18m
+        alertname: UNASPoolSeriesAbsent
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: "UNAS reports a healthy scrape but no pools"
+              description: "unas_pool_status has been absent for 15m while unas_scrape_collector_success reads 1. The collector is scraping successfully and returning no storage pools — most likely the device payload changed shape. Every pool alert is silently unable to fire until this is fixed."
+
+  # And the guard that keeps these two from double-paging: the same missing
+  # series while the collector is FAILING is UNASCollectorFailing's business,
+  # not theirs.
+  - interval: 1m
+    input_series:
+      - series: 'unas_scrape_collector_success'
+        values: '0+0x20'
+    alert_rule_test:
+      - eval_time: 18m
+        alertname: UNASDiskSeriesAbsent
+        exp_alerts: []
+      - eval_time: 18m
+        alertname: UNASPoolSeriesAbsent
+        exp_alerts: []
+      - eval_time: 18m
+        alertname: UNASCollectorFailing
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "UNAS metrics collection is failing"
+              description: "The UNAS collector has failed every scrape for 15m; all unas_* series are stale or absent."

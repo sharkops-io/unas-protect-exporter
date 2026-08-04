@@ -12,12 +12,24 @@ docker build -t unas-protect-exporter:test .
 docker run --rm unas-protect-exporter:test --help
 ```
 
+The linter set lives in `.golangci.yml`, and `.gitlab-ci.yml` pins the image
+tag. If your local `golangci-lint` disagrees with CI, match the pinned version
+rather than editing the config — and note that golangci-lint refuses to run at
+all when it was built against an older Go than `go.mod` targets, so the pin,
+`GO_VERSION` and the `go` directive move together.
+
 `go test` covers, among other things:
 
 - Golden exposition tests for both the `unas` and `protect` mappers — each
   asserts the exact Prometheus text output for a fixture, not just "no error".
-- Collector isolation (`internal/collector`) — one collector's failure or
-  panic must not affect the other's series.
+- Collector isolation, at two levels. `internal/collector` covers the
+  registry's view: a failing, panicking or duplicate-emitting collector must
+  not cost another collector its series.
+  `cmd/unas-protect-exporter/main_test.go` covers the same property where it
+  actually has to hold — a real GET against `/metrics`, asserting HTTP 200 and
+  the surviving families. Keep both. Every seam here was individually green
+  while the assembled endpoint returned an empty 500 for any gather error,
+  because nothing tested the assembly.
 - Session reuse (`internal/unifios`, `internal/protect`) — a scrape must not
   re-authenticate every interval.
 - Dashboard validation (`dashboards/dashboards_test.go`) — every PromQL query

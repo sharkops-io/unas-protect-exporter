@@ -19,10 +19,10 @@ func b2f(b bool) float64 {
 // float seconds.
 func msToSeconds(ms int64) float64 { return float64(ms) / 1000 }
 
-// Samples maps a bootstrap payload onto the metric set. Pure, so the
-// mapping is testable without a device. Unlike unasSamples, it takes no clock:
-// Protect has no uptime metric (nvr.uptime is null on this platform), so there
-// is no staleness logic here that would need one.
+// Samples maps a bootstrap payload onto the metric set. Pure, so the mapping is
+// testable without a device. Unlike unas.Samples it takes no clock: Protect has
+// no uptime metric (nvr.uptime is null on this platform), so there is no
+// staleness logic here that would need one.
 //
 // Two rules govern every optional field here, and both exist because Prometheus
 // never corrects a sample once recorded:
@@ -34,7 +34,7 @@ func msToSeconds(ms int64) float64 { return float64(ms) / 1000 }
 //     last wifi numbers, and signalStrength 0 reads as a perfect signal.
 //
 // deviceName is the fallback for the NVR `device` label when the console
-// reports no name, mirroring unasSamples.
+// reports no name, mirroring unas.Samples' handling of the same label.
 func Samples(bs *Bootstrap, deviceName string) []metric.Sample {
 	out := make([]metric.Sample, 0, 64)
 	out = append(out, protectNVRSamples(bs, deviceName)...)
@@ -131,8 +131,10 @@ func protectCameraSamples(bs *Bootstrap) []metric.Sample {
 				"Unix timestamp of the camera's last motion event.", msToSeconds(*c.LastMotion), cl))
 		}
 
-		// Wifi readings are only meaningful while connected — see the doc
-		// comment on protectSamples.
+		// Wifi readings are only meaningful while connected: a disconnected
+		// camera keeps reporting its last numbers, and signalStrength 0 reads
+		// as a perfect signal. See the "stale source is omitted" rule on
+		// Samples.
 		if c.IsConnected {
 			if c.Stats.Wifi.SignalQuality != nil {
 				out = append(out, metric.Gauge("protect_camera_wifi_signal_quality",

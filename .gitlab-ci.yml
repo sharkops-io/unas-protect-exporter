@@ -21,9 +21,15 @@ variables:
   REGISTRY_PASSWORD: $CI_REGISTRY_PASSWORD
   IMAGE_NAME: $CI_REGISTRY_IMAGE
 
+# Pinned, not :latest. golangci-lint refuses to run when the Go version it was
+# built with is older than the one go.mod targets, so :latest turns a routine
+# upstream release into a red pipeline on an unchanged commit — and, the other
+# way round, silently changes the enabled linter set under you. The linter set
+# itself lives in .golangci.yml so this image and a contributor's local run
+# agree. Bump this tag together with GO_VERSION and go.mod's `go` directive.
 lint:
   stage: test
-  image: golangci/golangci-lint:latest
+  image: golangci/golangci-lint:v2.12.0
   script:
     - golangci-lint run --timeout 5m
 

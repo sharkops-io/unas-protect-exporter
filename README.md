@@ -41,7 +41,10 @@ exist so a Helm values file can stay fully declarative.
 |---|---|---|---|
 | `--web.listen-address` | — | `:9101` | Address to listen on. |
 | `--web.telemetry-path` | — | `/metrics` | Path under which to expose metrics. |
-| `--collector.timeout` | — | `25s` | Per-collector timeout. Keep below Prometheus' `scrape_timeout`. |
+| `--collector.timeout` | — | `25s` | Per-collector timeout for a whole scrape. Keep below Prometheus' `scrape_timeout`. |
+| `--http.timeout` | — | `10s` | Per-HTTP-request timeout. **Raise this too when raising `--collector.timeout`** — see below. |
+| `--log.level` | — | `info` | `debug`, `info`, `warn` or `error`. |
+| `--log.format` | — | `logfmt` | `logfmt` or `json`. |
 | `--collector.unas` | — | `true` | Enable the UNAS collector. |
 | `--collector.protect` | — | `true` | Enable the Protect collector. |
 | `--unas.url` | `UNAS_URL` | — | UniFi OS URL of the UNAS. |
@@ -64,6 +67,34 @@ successfully scrape.
 
 Run `unas-protect-exporter --help` for the same list generated straight from
 the binary.
+
+### The two timeouts are not the same timeout
+
+`--collector.timeout` bounds one collector's whole scrape. `--http.timeout`
+bounds each individual HTTP request inside it, and a scrape is more than one
+request: the UNAS collector fetches `/storage` **and** `/systems/device-info`,
+and the Protect collector may log in before fetching the bootstrap (and
+re-login and retry once on a 401).
+
+So raising `--collector.timeout` alone does nothing for a slow device — every
+request is still cut off at `--http.timeout`. Raise both. Conversely,
+`--collector.timeout` should comfortably exceed `--http.timeout` × the number
+of requests a scrape makes, or the collector deadline will fire mid-sequence
+and the extra per-request headroom is unreachable.
+
+A device that is slow enough to need this is usually a device with a real
+problem; prefer investigating it over raising both numbers past Prometheus'
+`scrape_timeout`.
+
+### Logging volume during an outage
+
+Every failed collection logs one `level=ERROR msg="collection failed"` line.
+A device that stays unreachable for hours therefore produces one such line per
+scrape interval, indefinitely — there is no rate limiting and no
+first-occurrence-only suppression. The `*_scrape_collector_success` gauge is
+the signal you should alert on; if the log volume is a problem for your log
+pipeline, `--log.level=error` is the floor and beyond that the answer is a
+drop rule on your collector, not a flag here.
 
 ## Metric reference
 
@@ -149,13 +180,39 @@ else below is literally the generator's output, unedited.
 | `unas_scrape_collector_success` | gauge |  | Whether the last collection for this collector succeeded (1) or failed (0). |
 | `unas_uptime_seconds` | gauge | `device` | Seconds since the UNAS device booted. |
 
+The table above covers the series this exporter *maps from device payloads*.
+The endpoint also serves three families it does not generate itself, which are
+worth knowing about before you write a recording rule or a cardinality budget
+against it:
+
+- `go_*` and `process_*` — the standard Go runtime and process collectors,
+  registered by default. Drop them with a `metric_relabel_configs` action if
+  you do not want them.
+- `promhttp_*` — in particular
+  `promhttp_metric_handler_errors_total{cause="gathering"}`. This exporter
+  serves partial results rather than failing a whole scrape (see below), so
+  that counter is how a gather error becomes visible at all. A non-zero
+  `increase()` on it means some series were dropped from a response that
+  otherwise looked fine; it is worth an alert.
+
 A field that is null on the source device is **omitted from the sample**,
 never emitted as zero — most visibly the `*_timestamp_seconds` "last event"
 series (`protect_sensor_leak_detected_timestamp_seconds` and friends): an
 absent series means "never happened", which is what lets alerts on them be
 recency checks rather than latches that can never clear once tripped.
 
-## Two things that are not obvious
+## Three things that are not obvious
+
+**One bad series does not blank the endpoint.** `/metrics` is served with
+`promhttp.ContinueOnError`: if one collector panics, or somehow emits a
+duplicate series, the response is still HTTP 200 carrying everything that
+gathered cleanly — the other device's entire namespace, the runtime families,
+and both `*_scrape_collector_success` gauges, so the collector-health alerts in
+`examples/rules.yaml` can still fire. The failure is recorded on
+`promhttp_metric_handler_errors_total{cause="gathering"}` instead of being
+turned into an empty HTTP 500. Alert on that counter; a scrape that looks
+healthy while quietly missing series is the one failure mode this design trades
+for.
 
 **TLS verification is on by default.** `--unas.insecure-skip-verify` and
 `--protect.insecure-skip-verify` both default to `false`. A UNAS or Protect
@@ -186,6 +243,21 @@ template-variable query in `dashboards/*.json` and fails the build if one
 references a metric or label this exporter doesn't produce, and the `rules`
 CI stage runs `promtool check rules` / `promtool test rules` against
 `examples/rules.yaml`.
+
+**If you are adopting these from outside this org**, both dashboards hard-code
+their Prometheus datasource as `"uid": "prometheus"`. That UID is whatever your
+Grafana assigned when the datasource was provisioned, and it is almost
+certainly not `prometheus` — Grafana generates a random UID unless a
+provisioning file pins one. Every panel will render "Datasource not found"
+until you either rename your datasource's UID to `prometheus` or
+search-and-replace it in `dashboards/*.json`. (Converting the dashboards to a
+`datasource` template variable would be the portable fix; they are not written
+that way today.) The `"uid": "-- Grafana --"` in `unas.json` is the built-in
+annotations datasource and needs no change.
+
+`examples/rules.yaml` similarly assumes both collectors are running. If you
+deploy with only one device configured, delete the `absent()` pair for the
+other — the file says so inline.
 
 Downstream Kubernetes deployments (Grafana sidecar ConfigMaps,
 `additionalPrometheusRulesMap` entries, etc.) vendor copies of these files.

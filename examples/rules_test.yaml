@@ -476,3 +476,61 @@ tests:
             exp_annotations:
               summary: "UNAS metrics collection is failing"
               description: "The UNAS collector has failed every scrape for 15m; all unas_* series are stale or absent."
+
+  # --- ProtectSensorSeriesAbsent: healthy scrape, sensor series present ---
+  - interval: 1m
+    input_series:
+      - series: 'protect_scrape_collector_success'
+        values: '1+0x20'
+      - series: 'protect_sensor_up{sensor="Protect Sensor",type="UFP-SENSE",mount_type="leak"}'
+        values: '1+0x20'
+    alert_rule_test:
+      - eval_time: 18m
+        alertname: ProtectSensorSeriesAbsent
+        exp_alerts: []
+
+  # The reshape: `sensors` renamed upstream, so protect_sensor_up decodes to
+  # nothing while the scrape still reports success. protect_nvr_info
+  # survives with (near-)empty labels, which is exactly how this looks on a
+  # real payload change — it is emitted unconditionally, not gated by a
+  # per-element loop the way protect_sensor_up is. This is also why
+  # protect_nvr_info itself was rejected as a second absence anchor: it
+  # cannot go absent from this failure mode.
+  - interval: 1m
+    input_series:
+      - series: 'protect_scrape_collector_success'
+        values: '1+0x20'
+      - series: 'protect_nvr_info{device="",version="",firmware_version="",market_name="",release_channel=""}'
+        values: '1+0x20'
+    alert_rule_test:
+      - eval_time: 10m             # inside for: 15m
+        alertname: ProtectSensorSeriesAbsent
+        exp_alerts: []
+      - eval_time: 18m
+        alertname: ProtectSensorSeriesAbsent
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: "Protect reports a healthy scrape but no sensors"
+              description: "protect_sensor_up has been absent for 15m while protect_scrape_collector_success reads 1. The collector is scraping successfully and returning no sensors — most likely the device payload changed shape. Any leak, tamper or battery alerting built on this series is silently unable to fire until this is fixed."
+
+  # And the guard that keeps this from double-paging: the same missing
+  # series while the collector is FAILING is ProtectCollectorFailing's
+  # business, not ProtectSensorSeriesAbsent's.
+  - interval: 1m
+    input_series:
+      - series: 'protect_scrape_collector_success'
+        values: '0+0x20'
+    alert_rule_test:
+      - eval_time: 18m
+        alertname: ProtectSensorSeriesAbsent
+        exp_alerts: []
+      - eval_time: 18m
+        alertname: ProtectCollectorFailing
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "Protect metrics collection is failing"
+              description: "The Protect collector has failed every scrape for 15m; all protect_* series are stale or absent."

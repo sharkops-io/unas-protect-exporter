@@ -19,6 +19,7 @@ import (
 	"net/http/cookiejar"
 	"strings"
 	"sync"
+	"time"
 
 	"gitlab.com/sharkops/exporters/unas-protect-exporter/internal/httpx"
 )
@@ -57,6 +58,9 @@ type Options struct {
 	// cert throws away the protection for nothing. Callers pointing at a bare IP
 	// with a self-signed cert opt in explicitly.
 	InsecureSkipVerify bool
+	// Timeout bounds each individual HTTP request (login as well as data
+	// requests). Zero falls back to httpx.DefaultTimeout.
+	Timeout time.Duration
 }
 
 // New builds a Session. The cookie jar is what carries the TOKEN cookie across
@@ -76,6 +80,7 @@ func New(host, username, password string, opts Options) (*Session, error) {
 		client: httpx.New(httpx.Options{
 			InsecureSkipVerify: opts.InsecureSkipVerify,
 			CookieJar:          jar,
+			Timeout:            opts.Timeout,
 		}),
 	}, nil
 }
@@ -252,7 +257,10 @@ func (s *Session) doGet(ctx context.Context, url string) ([]byte, int, error) {
 	}
 	defer resp.Body.Close()
 
-	b, err := io.ReadAll(io.LimitReader(resp.Body, 32<<20))
+	// Shared bound with httpx.GetBytes, and an ERROR on overflow rather than a
+	// silent truncation: a truncated bootstrap surfaces as a JSON syntax error
+	// at an arbitrary offset, which looks like a firmware bug and is not.
+	b, err := httpx.ReadBodyLimited(resp.Body)
 	if err != nil {
 		return nil, resp.StatusCode, err
 	}

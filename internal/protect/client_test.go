@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"testing"
+	"time"
 )
 
 // loadFixture decodes the redacted 2026-08-02 capture of the live device.
@@ -173,5 +174,19 @@ func TestNewSkipsVerificationOnlyWhenExplicitlyDisabled(t *testing.T) {
 	tr, ok := c2.session.HTTPClient().Transport.(*http.Transport)
 	if !ok || tr.TLSClientConfig == nil || !tr.TLSClientConfig.InsecureSkipVerify {
 		t.Error("expected the insecure transport when InsecureSkipVerify is true")
+	}
+}
+
+// TestNewAppliesTheRequestTimeout pins that Config.Timeout reaches the session's
+// HTTP client. Before --http.timeout existed nothing set it, and every Protect
+// request was capped at httpx.DefaultTimeout regardless of --collector.timeout.
+func TestNewAppliesTheRequestTimeout(t *testing.T) {
+	c, err := New(Config{URL: "https://protect.example.com", Username: "u", Password: "p",
+		Timeout: 42 * time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := c.session.HTTPClient().Timeout; got != 42*time.Second {
+		t.Errorf("client timeout = %v, want 42s", got)
 	}
 }

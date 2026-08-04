@@ -6,6 +6,9 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
+
+	"gitlab.com/sharkops/exporters/unas-protect-exporter/internal/httpx"
 )
 
 func newTestClient(t *testing.T, h http.HandlerFunc) *Client {
@@ -315,5 +318,27 @@ func TestNewInsecureSkipVerify(t *testing.T) {
 	tr, ok := c2.httpClient.Transport.(*http.Transport)
 	if !ok || tr.TLSClientConfig == nil || !tr.TLSClientConfig.InsecureSkipVerify {
 		t.Error("expected the insecure transport when InsecureSkipVerify is true")
+	}
+}
+
+// TestNewAppliesTheRequestTimeout pins the plumbing that made --http.timeout
+// mean anything. Config.Timeout was previously never set, so httpx.New always
+// fell back to its 10s default and a larger --collector.timeout could not
+// actually give a slow NAS more time.
+func TestNewAppliesTheRequestTimeout(t *testing.T) {
+	c, err := New(Config{URL: "https://unas.example.com", APIKey: "k", Timeout: 42 * time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := c.httpClient.Timeout; got != 42*time.Second {
+		t.Errorf("client timeout = %v, want 42s", got)
+	}
+
+	def, err := New(Config{URL: "https://unas.example.com", APIKey: "k"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := def.httpClient.Timeout; got != httpx.DefaultTimeout {
+		t.Errorf("default client timeout = %v, want %v", got, httpx.DefaultTimeout)
 	}
 }

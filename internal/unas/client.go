@@ -21,6 +21,11 @@ type Config struct {
 	URL                string
 	APIKey             string
 	InsecureSkipVerify bool
+	// Timeout bounds each individual HTTP request. Zero falls back to
+	// httpx.DefaultTimeout. It is distinct from the collector timeout, which
+	// bounds a whole scrape: GetStorage makes two requests, so the collector
+	// timeout must exceed twice this for both to be reachable.
+	Timeout time.Duration
 }
 
 const (
@@ -34,9 +39,11 @@ const (
 type Storage struct {
 	Pools []Pool `json:"pools"`
 	Disks []Disk `json:"disks"`
-	// DeviceInfo's json tag is inert for the /storage response (the device does
-	// not return that key); it mirrors the key GetStorage merges device-info
-	// under, so both fetches populate recognisably the same shape.
+	// DeviceInfo's json tag is inert: the /storage response carries no such
+	// key, and GetStorage decodes the device-info payload straight into this
+	// field rather than through a wrapper. The tag is kept only so the struct
+	// round-trips through encoding/json under a stable, readable name — nothing
+	// on the wire depends on it.
 	DeviceInfo DeviceInfo `json:"device_info"`
 	// HasDeviceInfo reports whether the best-effort device-info fetch actually
 	// produced a payload. Callers MUST check it before publishing anything off
@@ -145,9 +152,12 @@ func New(cfg Config) (*Client, error) {
 		return nil, fmt.Errorf("unas api key is required")
 	}
 	return &Client{
-		host:       strings.TrimRight(cfg.URL, "/"),
-		apiKey:     cfg.APIKey,
-		httpClient: httpx.New(httpx.Options{InsecureSkipVerify: cfg.InsecureSkipVerify}),
+		host:   strings.TrimRight(cfg.URL, "/"),
+		apiKey: cfg.APIKey,
+		httpClient: httpx.New(httpx.Options{
+			InsecureSkipVerify: cfg.InsecureSkipVerify,
+			Timeout:            cfg.Timeout,
+		}),
 	}, nil
 }
 

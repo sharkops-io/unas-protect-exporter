@@ -14,8 +14,39 @@ import (
 	"time"
 )
 
-// DefaultTimeout is used when Options.Timeout is zero.
+// DefaultTimeout is used when Options.Timeout is zero. It bounds a single
+// HTTP request, not a whole scrape; callers that want a different bound set
+// Options.Timeout (the exporter binary wires --http.timeout to it).
 const DefaultTimeout = 10 * time.Second
+
+// MaxResponseBytes caps how much of a response body this package will read, so
+// a wedged or hostile device cannot make the exporter allocate without limit.
+// 32 MiB is far beyond any UniFi storage or bootstrap payload.
+//
+// Overflow is an ERROR, never a truncation. A silently truncated body reaches
+// the caller as a JSON syntax error at some arbitrary offset, which reads like
+// a device firmware bug and sends whoever debugs it in exactly the wrong
+// direction.
+const MaxResponseBytes = 32 << 20
+
+// ErrResponseTooLarge is returned when a response body exceeds MaxResponseBytes.
+var ErrResponseTooLarge = fmt.Errorf("response body exceeds %d bytes", MaxResponseBytes)
+
+// ReadBodyLimited reads at most MaxResponseBytes from r, returning
+// ErrResponseTooLarge if there was more to read. It is exported so clients that
+// issue their own requests (internal/unifios) enforce the same bound.
+func ReadBodyLimited(r io.Reader) ([]byte, error) {
+	// limit+1 so a body of exactly the limit is fine while one byte more is
+	// detectable — io.ReadAll over a LimitReader alone cannot tell the two apart.
+	b, err := io.ReadAll(io.LimitReader(r, MaxResponseBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(b) > MaxResponseBytes {
+		return nil, ErrResponseTooLarge
+	}
+	return b, nil
+}
 
 // Options configures a client built by New.
 type Options struct {
@@ -63,7 +94,7 @@ func (e *HTTPError) Error() string {
 
 // GetBytes performs a GET with the given headers and returns the response body
 // for a 2xx status. Non-2xx responses return an *HTTPError. The response body is
-// always closed.
+// always closed, and is bounded by MaxResponseBytes.
 func GetBytes(ctx context.Context, client *http.Client, url string, headers map[string]string) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -79,7 +110,7 @@ func GetBytes(ctx context.Context, client *http.Client, url string, headers map[
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := ReadBodyLimited(resp.Body)
 	if err != nil {
 		return nil, err
 	}

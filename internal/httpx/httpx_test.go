@@ -65,3 +65,37 @@ func TestGetBytesNon2xxReturnsHTTPError(t *testing.T) {
 		t.Errorf("StatusCode = %d, want 401", httpErr.StatusCode)
 	}
 }
+
+// TestGetBytesRejectsAnOversizedBody pins the loud half of the response cap.
+// The previous behaviour was an unbounded io.ReadAll here and a SILENT
+// truncation at 32 MiB in unifios.doGet; a truncated body surfaces to the
+// caller as "unexpected end of JSON input" at an arbitrary offset, which reads
+// like a device firmware bug and sends whoever debugs it the wrong way.
+func TestGetBytesRejectsAnOversizedBody(t *testing.T) {
+	// One byte past the cap: proof the limit+1 read is what distinguishes
+	// "exactly at the cap" from "over it".
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Write(make([]byte, MaxResponseBytes+1))
+	}))
+	defer srv.Close()
+
+	_, err := GetBytes(context.Background(), New(Options{}), srv.URL, nil)
+	if !errors.Is(err, ErrResponseTooLarge) {
+		t.Fatalf("err = %v, want ErrResponseTooLarge (a truncated body must never be returned as success)", err)
+	}
+}
+
+func TestGetBytesAcceptsABodyExactlyAtTheCap(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Write(make([]byte, MaxResponseBytes))
+	}))
+	defer srv.Close()
+
+	body, err := GetBytes(context.Background(), New(Options{}), srv.URL, nil)
+	if err != nil {
+		t.Fatalf("a body of exactly MaxResponseBytes must be accepted, got %v", err)
+	}
+	if len(body) != MaxResponseBytes {
+		t.Errorf("len(body) = %d, want %d", len(body), MaxResponseBytes)
+	}
+}

@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"gitlab.com/sharkops/exporters/unas-protect-exporter/internal/unifios"
 )
@@ -25,6 +26,12 @@ type Config struct {
 	Username           string
 	Password           string
 	InsecureSkipVerify bool
+	// Timeout bounds each individual HTTP request. Zero falls back to
+	// httpx.DefaultTimeout. It is distinct from the collector timeout, which
+	// bounds a whole scrape: a bootstrap fetch can be preceded by a login and
+	// followed by a retry, so the collector timeout must leave room for all of
+	// them.
+	Timeout time.Duration
 }
 
 type Client struct {
@@ -38,7 +45,7 @@ func New(cfg Config) (*Client, error) {
 	}
 	host := strings.TrimRight(cfg.URL, "/")
 	session, err := unifios.New(host, cfg.Username, cfg.Password,
-		unifios.Options{InsecureSkipVerify: cfg.InsecureSkipVerify})
+		unifios.Options{InsecureSkipVerify: cfg.InsecureSkipVerify, Timeout: cfg.Timeout})
 	if err != nil {
 		return nil, err
 	}

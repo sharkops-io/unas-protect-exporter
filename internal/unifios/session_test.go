@@ -2,11 +2,15 @@ package unifios
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
+
+	"gitlab.com/sharkops/exporters/unas-protect-exporter/internal/httpx"
 )
 
 // osServer serves the UniFi OS login shape. authOK flips to make /data return
@@ -105,11 +109,13 @@ func TestGetGivesUpAfterSecond401(t *testing.T) {
 }
 
 // TestConcurrentGetsLoginOnce drives the scenario that motivated single-flight
-// auth: the Protect client is cached per-integration and shared between the
-// metrics-bridge poll and IntegrationSummary, so overlapping first calls into
-// a fresh session are routine, not theoretical. N goroutines racing Get on a
-// never-yet-authenticated session must still produce exactly one login. Run
-// with -race: authMu/gen are what make this safe under the race detector.
+// auth: one Session is reused across scrapes, and Prometheus is free to scrape
+// /metrics from several servers at once, so overlapping first calls into a
+// fresh session are routine rather than theoretical — and each one that
+// stacked its own login would be a POST /api/auth/login the console has to
+// process. N goroutines racing Get on a never-yet-authenticated session must
+// still produce exactly one login. Run with -race: authMu/gen are what make
+// this safe under the race detector.
 func TestConcurrentGetsLoginOnce(t *testing.T) {
 	var logins int32
 	srv := osServer(t, &logins, func(int32) int { return http.StatusOK })
@@ -209,5 +215,49 @@ func TestConcurrentReauthLogsInOnce(t *testing.T) {
 func TestNewRequiresCredentials(t *testing.T) {
 	if _, err := New("https://x", "", "", Options{}); err == nil {
 		t.Fatal("expected an error without username/password")
+	}
+}
+
+// TestGetRejectsAnOversizedBody covers the same cap on the session's own read
+// path. doGet used to io.LimitReader(32<<20) and return the truncated bytes
+// with a nil error, so an oversized bootstrap reached the caller as a JSON
+// syntax error rather than as "this response was too big".
+func TestGetRejectsAnOversizedBody(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/auth/login" {
+			w.Header().Set("X-CSRF-Token", "t")
+			return
+		}
+		w.Write(make([]byte, httpx.MaxResponseBytes+1))
+	}))
+	defer srv.Close()
+
+	s, err := New(srv.URL, "u", "p", Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Get(context.Background(), srv.URL+"/data"); !errors.Is(err, httpx.ErrResponseTooLarge) {
+		t.Fatalf("err = %v, want httpx.ErrResponseTooLarge", err)
+	}
+}
+
+// TestNewAppliesTheRequestTimeout pins the plumbing that made --http.timeout
+// mean anything: before it, Options.Timeout was never set and every request
+// was capped at httpx.DefaultTimeout no matter what the flags said.
+func TestNewAppliesTheRequestTimeout(t *testing.T) {
+	s, err := New("https://unifi.example.com", "u", "p", Options{Timeout: 42 * time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := s.HTTPClient().Timeout; got != 42*time.Second {
+		t.Errorf("client timeout = %v, want 42s", got)
+	}
+
+	def, err := New("https://unifi.example.com", "u", "p", Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := def.HTTPClient().Timeout; got != httpx.DefaultTimeout {
+		t.Errorf("default client timeout = %v, want %v", got, httpx.DefaultTimeout)
 	}
 }

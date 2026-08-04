@@ -24,35 +24,7 @@ func collectorFor(t *testing.T, st *Storage, name string, now time.Time) prometh
 	return out
 }
 
-func testStorage() *Storage {
-	st := &Storage{
-		Disks: []Disk{{
-			SlotID: "1", Serial: "REDACTED1", Model: "EXAMPLE-16TB", Type: "HDD",
-			State: "optimal", Size: 16000900661248, HealthScore: 5, Temperature: 45,
-			PowerOnHours: 11874, BadSectorCount: 0, UncorrectableSectorCount: 0,
-			SmartReadErrorCount: 0, ReadErrorRate: 36427417, ReadKBPS: 245760, WriteKBPS: 0,
-		}},
-		Pools: []Pool{{
-			ID: "pool-uuid-1", Number: 1, PreferLevel: "raid6", Status: "scrubbing",
-			Capacity: 79960856330240, Usage: 26826967351296,
-			DataScrubbing: DataScrubbing{Status: "inProgress", Progress: 38},
-			RaidGroups: []RaidGroup{{
-				ID: "raid-group-1", Number: 1, ConfigLevel: "raid6", CurrentLevel: "raid6",
-				CurrentProtection: 2, ExpectedProtection: 2, Progress: 38,
-			}},
-		}},
-		HasDeviceInfo: true,
-	}
-	st.DeviceInfo.Name = "ExampleNAS"
-	st.DeviceInfo.Model = "UNASPRO"
-	st.DeviceInfo.Version = "4.4.7"
-	st.DeviceInfo.FirmwareVersion = "5.1.27"
-	st.DeviceInfo.CPU.CurrentLoad = 0.069
-	st.DeviceInfo.CPU.Temperature = 66
-	st.DeviceInfo.Memory.Total = 8272256
-	st.DeviceInfo.Memory.Available = 2915712
-	return st
-}
+func testStorage() *Storage { return FixtureStorage() }
 
 func TestSamplesDiskExposition(t *testing.T) {
 	c := collectorFor(t, testStorage(), "fallback", time.Now())
@@ -159,7 +131,8 @@ func TestSamplesUsesDeviceNameFallback(t *testing.T) {
 }
 
 func TestSamplesOmitsUptimeWithoutStartupTime(t *testing.T) {
-	st := testStorage() // StartupTime left zero
+	st := testStorage()
+	st.DeviceInfo.StartupTime = StartupTime{} // FixtureStorage sets a real one; zero it here
 
 	samples := Samples(st, "fallback", time.Now())
 	if len(samples) == 0 {

@@ -2,7 +2,6 @@ package protect
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -42,23 +41,6 @@ func namesIn(bs *Bootstrap, name string) map[string]bool {
 		got[s.Name] = true
 	}
 	return got
-}
-
-// FixtureBootstrap loads and decodes the redacted bootstrap payload captured
-// in testdata/bootstrap.json. Exported so later work needing the same real
-// payload (e.g. dashboard/rule validation) can reuse it rather than
-// re-deriving field names from scratch.
-func FixtureBootstrap(t *testing.T) *Bootstrap {
-	t.Helper()
-	b, err := os.ReadFile("testdata/bootstrap.json")
-	if err != nil {
-		t.Fatalf("read fixture: %v", err)
-	}
-	var bs Bootstrap
-	if err := json.Unmarshal(b, &bs); err != nil {
-		t.Fatalf("decode fixture: %v", err)
-	}
-	return &bs
 }
 
 // testBootstrap returns a fresh decode of the fixture so mutations applied by

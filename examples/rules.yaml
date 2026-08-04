@@ -201,3 +201,42 @@ groups:
         annotations:
           summary: "UNAS reports a healthy scrape but no pools"
           description: "unas_pool_status has been absent for 15m while unas_scrape_collector_success reads 1. The collector is scraping successfully and returning no storage pools — most likely the device payload changed shape. Every pool alert is silently unable to fire until this is fixed."
+
+      # Protect's own version of the two backstops above — this file shipped
+      # the UNAS pair but no Protect equivalent, which is an asymmetry rather
+      # than a deliberate choice: the reasoning isn't UNAS-specific. A UniFi
+      # OS update that renames a key in /proxy/protect/api/bootstrap decodes
+      # cleanly into a zero-valued struct the same way — err is nil, success
+      # stays 1, and protect_camera_up / protect_sensor_up / protect_bridge_up
+      # all vanish at once (they're populated by looping over decoded
+      # slices; an empty slice from a renamed key just produces zero
+      # samples, not an error).
+      #
+      # Anchored on protect_sensor_up rather than protect_camera_up:
+      # protect_camera_up is still emitted (at 0) for a merely disconnected
+      # camera, so its absence is a weaker canary for "the series itself
+      # vanished" than an always-connected-in-practice sensor fleet.
+      # protect_sensor_up also carries any leak/tamper/battery alerts a
+      # downstream consumer builds on top of this file, making it the metric
+      # most worth protecting.
+      #
+      # protect_nvr_info was considered as a second anchor, the way UNAS
+      # gets two (disks and pools are independently reshapable). It does NOT
+      # work the same way: protect_nvr_info is appended unconditionally
+      # regardless of how the nested NVR fields decode (it is not gated by a
+      # per-element loop the way protect_camera_up/protect_sensor_up/
+      # protect_bridge_up are), so a reshape under the `nvr` key still
+      # produces protect_nvr_info with empty/zero labels rather than an
+      # absent series. Anchoring on it would add a rule that can
+      # structurally never fire.
+      #
+      # Same `and on()` caveat as the UNAS pair: this only works because
+      # protect_scrape_collector_success carries no labels.
+      - alert: ProtectSensorSeriesAbsent
+        expr: absent(protect_sensor_up) and on() protect_scrape_collector_success == 1
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Protect reports a healthy scrape but no sensors"
+          description: "protect_sensor_up has been absent for 15m while protect_scrape_collector_success reads 1. The collector is scraping successfully and returning no sensors — most likely the device payload changed shape. Any leak, tamper or battery alerting built on this series is silently unable to fire until this is fixed."

@@ -15,6 +15,16 @@ in `CONTRIBUTING.md` — a renamed or removed metric name is a breaking change.
   as the uncorrectable/bad sector alerts) — the metric was always emitted by
   the `unas` collector, it just had no example alert. Added, with a
   `promtool test` pair in `examples/rules_test.yaml`.
+- `examples/rules.yaml` shipped an `absent()` backstop pair for the `unas`
+  collector (`UNASDiskSeriesAbsent`, `UNASPoolSeriesAbsent`) but nothing
+  equivalent for `protect`, even though the same failure mode applies: a
+  reshaped bootstrap payload decodes cleanly to an empty slice, so
+  `protect_scrape_collector_success` stays 1 while `protect_sensor_up` (and
+  the leak/tamper/battery alerting built on it) silently vanishes. Added
+  `ProtectSensorSeriesAbsent`, anchored on `protect_sensor_up` rather than
+  `protect_camera_up` (which stays present at 0 for a merely disconnected
+  camera, making it a weaker canary), with a `promtool test` trio in
+  `examples/rules_test.yaml`.
 
 ## [0.1.0] - 2026-08-04
 

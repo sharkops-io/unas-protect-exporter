@@ -37,6 +37,17 @@ groups:
           summary: "UNAS disk in slot {{ $labels.slot }} gained a bad sector"
           description: "Disk {{ $labels.serial }} in slot {{ $labels.slot }} reported new bad sectors in the last 24h."
 
+      # Same increase()-over-24h shape and reasoning as the two sector
+      # counters above: a new SMART read error in the last 24h is
+      # actionable, a pre-existing count is not.
+      - alert: UNASDiskReadErrors
+        expr: increase(unas_disk_smart_read_error_count_total[24h]) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "UNAS disk in slot {{ $labels.slot }} reported a new SMART read error"
+          description: "Disk {{ $labels.serial }} in slot {{ $labels.slot }} reported new SMART read errors in the last 24h."
+
       - alert: UNASDiskOverheating
         expr: unas_disk_temperature_celsius > 55
         for: 30m

@@ -143,6 +143,32 @@ tests:
               summary: "UNAS disk in slot 1 gained a bad sector"
               description: "Disk REDACTED1 in slot 1 reported new bad sectors in the last 24h."
 
+  # --- UNASDiskReadErrors: same shape as the sector counters above ---
+  - interval: 5m
+    input_series:
+      - series: 'unas_disk_smart_read_error_count_total{slot="1",serial="REDACTED1"}'
+        values: '1+0x300'
+    alert_rule_test:
+      - eval_time: 24h
+        alertname: UNASDiskReadErrors
+        exp_alerts: []
+
+  - interval: 5m
+    input_series:
+      - series: 'unas_disk_smart_read_error_count_total{slot="1",serial="REDACTED1"}'
+        values: '1+0x150 2+0x150'   # one new read error partway through the window
+    alert_rule_test:
+      - eval_time: 24h
+        alertname: UNASDiskReadErrors
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              slot: "1"
+              serial: REDACTED1
+            exp_annotations:
+              summary: "UNAS disk in slot 1 reported a new SMART read error"
+              description: "Disk REDACTED1 in slot 1 reported new SMART read errors in the last 24h."
+
   # --- UNASPoolUnhealthy: for 5m. "scrubbing" is known-good and must not fire ---
   - interval: 1m
     input_series:

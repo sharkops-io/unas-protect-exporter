@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows the metric-surface compatibility contract described
 in `CONTRIBUTING.md` — a renamed or removed metric name is a breaking change.
 
+## [Unreleased]
+
+### Fixed
+
+- `examples/rules.yaml` was missing a `UNASDiskReadErrors` alert on
+  `unas_disk_smart_read_error_count_total` (increase() over 24h, same shape
+  as the uncorrectable/bad sector alerts) — the metric was always emitted by
+  the `unas` collector, it just had no example alert. Added, with a
+  `promtool test` pair in `examples/rules_test.yaml`.
+
 ## [0.1.0] - 2026-08-04
 
 Initial release.

@@ -108,9 +108,16 @@ func buildRegistry(cfg *config.Config) (*prometheus.Registry, error) {
 // which is the honest shape: partial data plus a counter saying so. It is what
 // makes the isolation this exporter's design promises actually hold. Registry
 // is also set so that counter exists on this endpoint at all.
+//
+// InstrumentMetricHandler wraps the handler to also register
+// promhttp_metric_handler_requests_total (by HTTP status code) and
+// promhttp_metric_handler_requests_in_flight on reg — the scrape-request
+// counters that HandlerFor alone does not produce. It only wraps; it does not
+// change ErrorHandling, which stays ContinueOnError.
 func metricsHandler(reg *prometheus.Registry) http.Handler {
-	return promhttp.HandlerFor(reg, promhttp.HandlerOpts{
+	h := promhttp.HandlerFor(reg, promhttp.HandlerOpts{
 		Registry:      reg,
 		ErrorHandling: promhttp.ContinueOnError,
 	})
+	return promhttp.InstrumentMetricHandler(reg, h)
 }

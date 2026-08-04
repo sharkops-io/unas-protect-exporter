@@ -8,6 +8,23 @@ in `CONTRIBUTING.md` — a renamed or removed metric name is a breaking change.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-08-04
+
+### Added
+
+- `/metrics` is now wrapped in `promhttp.InstrumentMetricHandler`, which
+  registers `promhttp_metric_handler_requests_total` (by HTTP status `code`)
+  and `promhttp_metric_handler_requests_in_flight` on the same registry.
+  `ErrorHandling` stays `promhttp.ContinueOnError` — this only wraps the
+  existing handler, it does not change how gather errors are handled.
+- A collapsed "Exporter Health" row in both `dashboards/unas.json` and
+  `dashboards/protect.json`, matching the shape already used elsewhere for
+  exporter self-monitoring: collector success/duration, gather errors
+  (`promhttp_metric_handler_errors_total{cause="gathering"}` — previously
+  alerted on via `ExporterGatheringErrors` but with nowhere to see the
+  trend), scrape requests, goroutines, Go heap, RSS and CPU. All new queries
+  match on `job="unas-protect-exporter"`, never a `pod=` string.
+
 ### Fixed
 
 - `examples/rules.yaml` was missing a `UNASDiskReadErrors` alert on

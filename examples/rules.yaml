@@ -113,6 +113,23 @@ groups:
           summary: "Protect metrics collection is failing"
           description: "The Protect collector has failed every scrape for 15m; all protect_* series are stale or absent."
 
+      # This one catches a DIFFERENT failure mode from the two above: not a
+      # collector that can't reach its device, but /metrics itself dropping
+      # some series while still answering HTTP 200. This exporter serves
+      # /metrics with promhttp.ContinueOnError specifically so one bad
+      # collector (a duplicate series, a panic) can't blank the whole
+      # endpoint — the trade is that the only signal for a partial gather
+      # failure is this counter. It's a counter, so alert on increase() over
+      # a window rather than the raw value: a raw `> 0` latches forever after
+      # a single transient error.
+      - alert: ExporterGatheringErrors
+        expr: increase(promhttp_metric_handler_errors_total{cause="gathering"}[15m]) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "Exporter is dropping series on /metrics"
+          description: "promhttp_metric_handler_errors_total{cause=\"gathering\"} increased in the last 15m. /metrics is served with ContinueOnError, so this scrape returned HTTP 200 while silently missing series rather than failing outright — likely cause is a duplicate series or a panic in one collector."
+
   # absent() backstops. Everything above needs a series to evaluate; these are
   # the rules for when the series that would have alerted is simply not there.
   #

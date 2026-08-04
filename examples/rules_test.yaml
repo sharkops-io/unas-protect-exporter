@@ -298,6 +298,34 @@ tests:
               summary: "Protect metrics collection is failing"
               description: "The Protect collector has failed every scrape for 15m; all protect_* series are stale or absent."
 
+  # --- ExporterGatheringErrors: increase() over 15m, no for: ---
+  # A flat counter must NOT fire. This is the case that matters: it proves
+  # this isn't a latching `> 0` on the raw counter, which would alert forever
+  # after a single transient gathering error.
+  - interval: 1m
+    input_series:
+      - series: 'promhttp_metric_handler_errors_total{cause="gathering"}'
+        values: '3+0x20'
+    alert_rule_test:
+      - eval_time: 18m
+        alertname: ExporterGatheringErrors
+        exp_alerts: []
+
+  - interval: 1m
+    input_series:
+      - series: 'promhttp_metric_handler_errors_total{cause="gathering"}'
+        values: '3+0x10 4+0x10'    # one new gathering error partway through
+    alert_rule_test:
+      - eval_time: 18m
+        alertname: ExporterGatheringErrors
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              cause: gathering
+            exp_annotations:
+              summary: "Exporter is dropping series on /metrics"
+              description: 'promhttp_metric_handler_errors_total{cause="gathering"} increased in the last 15m. /metrics is served with ContinueOnError, so this scrape returned HTTP 200 while silently missing series rather than failing outright — likely cause is a duplicate series or a panic in one collector.'
+
   # --- absent() backstops: for 15m ---
   # Each of these needs a "the series exists" side too, because an absent()
   # rule with no such case would pass just as happily against `expr: vector(1)`.

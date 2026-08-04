@@ -4,6 +4,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -29,20 +30,46 @@ func main() {
 		os.Exit(0)
 	}
 	if err != nil {
+		// --log.level/--log.format live in the very config that failed to
+		// parse, so this one message necessarily goes out on the default handler.
 		slog.Error("configuration error", "err", err)
 		os.Exit(1)
 	}
+	slog.SetDefault(slog.New(cfg.LogHandler(os.Stderr)))
 
 	slog.Info("starting unas-protect-exporter", "version", version)
 
+	reg, err := buildRegistry(cfg)
+	if err != nil {
+		slog.Error("startup", "err", err)
+		os.Exit(1)
+	}
+
+	mux := http.NewServeMux()
+	mux.Handle(cfg.TelemetryPath, metricsHandler(reg))
+	// Deliberately NO /healthz. A probe that collects would couple this pod's
+	// restarts to the NAS and NVR being reachable; a broken exporter should
+	// surface as a DOWN Prometheus target instead.
+	slog.Info("listening", "address", cfg.ListenAddress, "path", cfg.TelemetryPath)
+	if err := http.ListenAndServe(cfg.ListenAddress, mux); err != nil {
+		slog.Error("http server", "err", err)
+		os.Exit(1)
+	}
+}
+
+// buildRegistry wires the configured collectors onto a fresh registry. It is
+// split out of main, rather than inlined there, so the whole config → registry
+// → /metrics path is reachable from a test: that path is the only place all of
+// this exporter's seams meet, and it is where the ErrorHandling bug below went
+// unnoticed through five review rounds of per-package tests.
+func buildRegistry(cfg *config.Config) (*prometheus.Registry, error) {
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(collectors.NewGoCollector(), collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 
 	if cfg.UNASEnabled {
 		client, err := unas.New(cfg.UNAS)
 		if err != nil {
-			slog.Error("unas client", "err", err)
-			os.Exit(1)
+			return nil, fmt.Errorf("unas client: %w", err)
 		}
 		reg.MustRegister(collector.New(&unas.Source{Client: client, DeviceName: cfg.UNASName}, cfg.Timeout))
 		slog.Info("unas collector enabled", "url", cfg.UNAS.URL)
@@ -51,25 +78,39 @@ func main() {
 	if cfg.ProtectEnabled {
 		client, err := protect.New(cfg.Protect)
 		if err != nil {
-			slog.Error("protect client", "err", err)
-			os.Exit(1)
+			return nil, fmt.Errorf("protect client: %w", err)
 		}
 		reg.MustRegister(collector.New(&protect.Source{Client: client, DeviceName: cfg.ProtectName}, cfg.Timeout))
 		slog.Info("protect collector enabled", "url", cfg.Protect.URL)
 	}
 
 	if !cfg.UNASEnabled && !cfg.ProtectEnabled {
-		slog.Error("no collectors enabled; set --unas.url and/or --protect.url")
-		os.Exit(1)
+		return nil, errors.New("no collectors enabled; set --unas.url and/or --protect.url")
 	}
 
-	http.Handle(cfg.TelemetryPath, promhttp.HandlerFor(reg, promhttp.HandlerOpts{Registry: reg}))
-	// Deliberately NO /healthz. A probe that collects would couple this pod's
-	// restarts to the NAS and NVR being reachable; a broken exporter should
-	// surface as a DOWN Prometheus target instead.
-	slog.Info("listening", "address", cfg.ListenAddress, "path", cfg.TelemetryPath)
-	if err := http.ListenAndServe(cfg.ListenAddress, nil); err != nil {
-		slog.Error("http server", "err", err)
-		os.Exit(1)
-	}
+	return reg, nil
+}
+
+// metricsHandler serves reg at the telemetry path.
+//
+// ErrorHandling is ContinueOnError, and that is load-bearing rather than
+// stylistic. The zero value is HTTPErrorOnError, under which ANY error from a
+// single Gather — a duplicate series produced by one collector, or a panic
+// inside one collector, both of which the registry turns into a gather error
+// rather than a crash — is answered with HTTP 500 and an empty body. That
+// throws away every metric on the endpoint: the healthy device's entire
+// namespace, the Go and process series, and both _scrape_collector_success
+// gauges, so the very alerts meant to catch a broken collector go absent at
+// exactly the moment they are needed.
+//
+// ContinueOnError serves everything that gathered cleanly with HTTP 200 and
+// records the failure on promhttp_metric_handler_errors_total{cause="gathering"},
+// which is the honest shape: partial data plus a counter saying so. It is what
+// makes the isolation this exporter's design promises actually hold. Registry
+// is also set so that counter exists on this endpoint at all.
+func metricsHandler(reg *prometheus.Registry) http.Handler {
+	return promhttp.HandlerFor(reg, promhttp.HandlerOpts{
+		Registry:      reg,
+		ErrorHandling: promhttp.ContinueOnError,
+	})
 }

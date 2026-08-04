@@ -2,15 +2,22 @@
 // between a device payload and Prometheus exposition.
 //
 // It exists so the mapping logic ported from another-app compiles unchanged. It
-// is deliberately much smaller than its ancestor: another-app needed a
-// registry-wide snapshot map, cross-integration dedupe and a label-dimension
-// guard because many integrations shared one unchecked collector. Here each
-// collector owns its own output, so none of that applies.
+// is deliberately smaller than its ancestor: another-app needed a registry-wide
+// snapshot map, plus help-text and label-dimension guards, because many
+// integrations shared one unchecked collector and could disagree about a name.
+// Here each collector owns its own output, so none of that applies.
+//
+// Duplicate-series detection does still apply, and is the one guard that
+// survived the port: a duplicate can arise WITHIN a single device payload
+// (two UniFi Protect cameras may carry the same name), and a duplicate fails
+// the whole gather regardless of how many collectors are registered. See
+// Signature.
 package metric
 
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/model"
@@ -75,6 +82,25 @@ func (s Sample) Metric() (prometheus.Metric, error) {
 	}
 	return prometheus.NewConstMetric(
 		prometheus.NewDesc(s.Name, help, keys, nil), s.Kind.valueType(), s.Value, values...)
+}
+
+// Signature identifies the TIME SERIES a Sample renders to: the metric name
+// plus its label values in sorted-key order, which is exactly the tuple
+// Prometheus uses to tell two series of one metric apart.
+//
+// Two Samples that share a Signature are the same series, and client_golang
+// rejects both of them together — "collected metric ... was collected before
+// with the same name and label values" fails the ENTIRE gather, not just the
+// offending family. A caller holding a slice of Samples must therefore drop
+// later duplicates itself; see collector.Collect.
+//
+// The label keys are deliberately not part of the signature. Every metric name
+// this exporter emits carries a fixed set of keys (they are literals in the
+// mappers), so values alone are already a faithful series identity, and this
+// matches the guard another-app' metrics bridge used for the same purpose.
+func (s Sample) Signature() string {
+	_, values := sortedLabels(s.Labels)
+	return s.Name + "\x00" + strings.Join(values, "\x00")
 }
 
 // sortedLabels returns label keys and their values in matching sorted order,

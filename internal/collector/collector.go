@@ -94,7 +94,34 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 		slog.Error("collection failed", "collector", c.src.Namespace(), "err", err)
 	}
 
+	// Duplicate series are dropped here rather than left to the registry,
+	// because the registry's answer to a duplicate is to fail the ENTIRE gather
+	// — a 500 on /metrics that takes every unrelated metric with it, including
+	// the other device's whole namespace and both _scrape_collector_success
+	// gauges, so the collector-health alerts cannot fire either. (The handler in
+	// cmd/ also runs with ContinueOnError as a second layer of that same
+	// defense; this one keeps the good series in the affected namespace too.)
+	//
+	// This is not theoretical. A device payload can contain a duplicate all on
+	// its own: protect_camera_recording_enabled and protect_camera_state are
+	// keyed on the camera NAME, and UniFi Protect does not enforce unique
+	// camera names — two cameras sharing a name, or two freshly adopted ones
+	// that have no name yet, collide. Adding a disambiguating label instead is
+	// not an option: the metric surface is a frozen compatibility contract (see
+	// CONTRIBUTING.md).
+	//
+	// First sample of a series wins, which makes the choice deterministic for a
+	// given payload order.
+	seen := make(map[string]struct{}, len(samples))
 	for _, s := range samples {
+		sig := s.Signature()
+		if _, dup := seen[sig]; dup {
+			slog.Warn("dropping duplicate series",
+				"collector", c.src.Namespace(), "metric", s.Name, "labels", s.Labels)
+			continue
+		}
+		seen[sig] = struct{}{}
+
 		m, merr := s.Metric()
 		if merr != nil {
 			// One malformed series must not fail the whole gather, which would

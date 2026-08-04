@@ -5,8 +5,8 @@
 //
 // This package deliberately owns ONLY that session. The network-controller
 // specifics — API-key auth, the classic /api/login fallback, and the
-// /proxy/network path prefix — stay in internal/services/unifi, because they
-// have no meaning for the Protect API.
+// /proxy/network path prefix — stay in another-app' UniFi Network client,
+// because they have no meaning for the Protect API.
 package unifios
 
 import (
@@ -102,9 +102,10 @@ func (s *Session) CSRFToken() string {
 // reauth in ways that make it skip a re-login it still needed. Callers that
 // want single-flight behaviour must go through Get instead.
 //
-// internal/services/unifi calls Login directly on a Session it constructs for
-// itself and never shares with Get, so that bypass doesn't matter there — but
-// it would for any session that is also driven through Get.
+// another-app' UniFi Network client calls Login directly on a Session it
+// constructs for itself and never shares with Get, so that bypass doesn't
+// matter there — but it would for any session that is also driven through
+// Get.
 func (s *Session) Login(ctx context.Context) error {
 	body, _ := json.Marshal(map[string]string{"username": s.username, "password": s.password})
 

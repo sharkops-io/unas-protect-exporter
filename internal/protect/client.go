@@ -1,7 +1,7 @@
-// Package unifi_protect reads the UniFi Protect bootstrap payload from a UniFi
+// Package protect reads the UniFi Protect bootstrap payload from a UniFi
 // OS console.
 //
-// Protect authenticates with a cookie session (see internal/services/unifios),
+// Protect authenticates with a cookie session (see internal/unifios),
 // NOT the static X-API-Key the UNAS integration uses against
 // /proxy/drive/api/v2. One client does not work for both.
 package protect

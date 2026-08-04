@@ -1,6 +1,7 @@
 package protect
 
 import (
+	"context"
 	"strconv"
 	"strings"
 
@@ -271,4 +272,23 @@ func protectBridgeSamples(bs *Bootstrap) []metric.Sample {
 		}
 	}
 	return out
+}
+
+// Source adapts a Client to collector.Source. Reusing one Client across scrapes
+// is required, not just an optimisation: the client holds a UniFi OS cookie
+// session, and rebuilding it per scrape would POST /api/auth/login every
+// scrape interval, forever.
+type Source struct {
+	Client     *Client
+	DeviceName string
+}
+
+func (s *Source) Namespace() string { return "protect" }
+
+func (s *Source) Collect(ctx context.Context) ([]metric.Sample, error) {
+	bs, err := s.Client.GetBootstrap(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return Samples(bs, s.DeviceName), nil
 }

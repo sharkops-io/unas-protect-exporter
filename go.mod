@@ -3,12 +3,12 @@ module gitlab.com/sharkops/exporters/unas-protect-exporter
 go 1.26.5
 
 require (
+	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/prometheus/client_golang v1.24.1
 	github.com/prometheus/common v0.70.1
 )
 
 require (
-	github.com/alecthomas/kingpin/v2 v2.4.0 // indirect
 	github.com/alecthomas/units v0.0.0-20240927000941-0f3dac36c52b // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect

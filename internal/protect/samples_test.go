@@ -1,7 +1,10 @@
 package protect
 
 import (
+	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
@@ -193,5 +196,54 @@ func TestSamplesNVRUsesDeviceNameFallback(t *testing.T) {
 	// vacuously if protect_nvr_info is ever dropped or renamed.
 	if !found {
 		t.Fatal("protect_nvr_info was not emitted at all")
+	}
+}
+
+// newBootstrapServer serves the UniFi OS login shape and the redacted
+// bootstrap fixture, incrementing *logins on every POST /api/auth/login. It
+// mirrors unifios' own osServer helper (internal/unifios/session_test.go),
+// which client-level tests there use to drive login-count assertions.
+func newBootstrapServer(t *testing.T, logins *int) *httptest.Server {
+	t.Helper()
+	body, err := os.ReadFile("testdata/bootstrap.json")
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/api/auth/login":
+			*logins++
+			w.Header().Set("X-CSRF-Token", "csrf-abc")
+			http.SetCookie(w, &http.Cookie{Name: "TOKEN", Value: "t"})
+			w.Write([]byte(`{}`))
+		case r.Method == http.MethodGet && r.URL.Path == bootstrapPath:
+			w.Write(body)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+}
+
+func TestSourceReusesOneLogin(t *testing.T) {
+	var logins int
+	srv := newBootstrapServer(t, &logins)
+	defer srv.Close()
+
+	c, err := New(Config{URL: srv.URL, Username: "u", Password: "p", InsecureSkipVerify: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := &Source{Client: c, DeviceName: "fallback"}
+
+	for i := 0; i < 3; i++ {
+		if _, err := src.Collect(context.Background()); err != nil {
+			t.Fatalf("collect %d: %v", i, err)
+		}
+	}
+
+	// Three scrapes, one login. Rebuilding the client per scrape would make this
+	// 3 — and in production, one login every scrape interval forever.
+	if logins != 1 {
+		t.Errorf("logins = %d across 3 collections, want 1", logins)
 	}
 }

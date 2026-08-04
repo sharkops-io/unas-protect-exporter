@@ -1,6 +1,7 @@
 package unas
 
 import (
+	"context"
 	"time"
 
 	"gitlab.com/sharkops/exporters/unas-protect-exporter/internal/metric"
@@ -91,4 +92,21 @@ func Samples(st *Storage, deviceName string, now time.Time) []metric.Sample {
 	}
 
 	return out
+}
+
+// Source adapts a Client to collector.Source. The client is built once and
+// reused across scrapes so its HTTP connection pool survives.
+type Source struct {
+	Client     *Client
+	DeviceName string
+}
+
+func (s *Source) Namespace() string { return "unas" }
+
+func (s *Source) Collect(ctx context.Context) ([]metric.Sample, error) {
+	st, err := s.Client.GetStorage(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return Samples(st, s.DeviceName, time.Now()), nil
 }

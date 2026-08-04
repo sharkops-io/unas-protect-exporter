@@ -1,0 +1,245 @@
+{
+ "nvr": {
+  "name": "Example Dream Machine",
+  "version": "7.1.87",
+  "firmwareVersion": "5.1.26",
+  "marketName": "UDM Pro",
+  "releaseChannel": "release",
+  "recordingRetentionDurationMs": null,
+  "lastSeen": 1785693812793,
+  "isRecordingDisabled": false,
+  "mac": "000000000001",
+  "host": "192.0.2.1",
+  "systemInfo": {
+   "cpu": {
+    "averageLoad": 21.2,
+    "temperature": 41.8
+   },
+   "memory": {
+    "available": 1118524,
+    "free": 223912,
+    "total": 4040828
+   },
+   "storage": {
+    "available": 910194614272,
+    "isRecycling": false,
+    "size": 983429763072,
+    "type": "hdd",
+    "used": 73235148800,
+    "capability": "ok",
+    "devices": [
+     {
+      "model": "WDC WD10PURZ-85U8XY0",
+      "size": 1000204886016,
+      "healthy": "good"
+     }
+    ]
+   },
+   "ustorage": {
+    "hotspare": false,
+    "raid": null,
+    "disks": [
+     {
+      "slot": 1,
+      "type": "HDD",
+      "model": "WDC WD10PURZ-85U8XY0",
+      "size": 1000204886016,
+      "firmware": "01.01A01",
+      "rpm": 5400,
+      "ata": "SATA 3.0",
+      "sata": "SATA 3.0",
+      "action": "none",
+      "healthy": "good",
+      "state": "normal",
+      "reason": [],
+      "serial": "REDACTED-SERIAL-1"
+     }
+    ]
+   }
+  }
+ },
+ "cameras": [
+  {
+   "name": "Example Camera",
+   "type": "UVC G4 Instant",
+   "state": "DISCONNECTED",
+   "isConnected": false,
+   "isRecording": true,
+   "isMotionDetected": false,
+   "lastSeen": 1783825797928,
+   "lastMotion": 1783826090900,
+   "firmwareVersion": "5.3.95",
+   "firmwareBuild": "148b9a3.260612.645",
+   "isAdopted": true,
+   "upSince": 1783730406019,
+   "connectedSince": null,
+   "wiredConnectionState": {
+    "phyRate": null
+   },
+   "mac": "000000000010",
+   "id": "fixture-cam-g4-instant",
+   "stats": {
+    "wifi": {
+     "channel": null,
+     "frequency": null,
+     "linkSpeedMbps": null,
+     "signalQuality": 50,
+     "signalStrength": 0
+    },
+    "wifiQuality": 50,
+    "wifiStrength": 0,
+    "storage": {
+     "used": null,
+     "rate": null,
+     "channelStorage": {
+      "0": {
+       "rotating": {
+        "recordingsSizeBytes": 28991029248,
+        "lockedRecordingsSizeBytes": 0
+       },
+       "timelapse": {
+        "recordingsSizeBytes": 1073741824,
+        "lockedRecordingsSizeBytes": 0
+       }
+      },
+      "2": {
+       "rotating": {
+        "recordingsSizeBytes": 2147483648,
+        "lockedRecordingsSizeBytes": 0
+       },
+       "timelapse": {
+        "recordingsSizeBytes": 1073741824,
+        "lockedRecordingsSizeBytes": 0
+       }
+      }
+     }
+    }
+   }
+  }
+ ],
+ "sensors": [
+  {
+   "name": "Example Sensor",
+   "type": "UFP-SENSE",
+   "state": "CONNECTED",
+   "isConnected": true,
+   "mountType": "leak",
+   "firmwareVersion": "1.2.5",
+   "lastSeen": 1785313708832,
+   "isMotionDetected": false,
+   "isOpened": null,
+   "leakDetectedAt": null,
+   "tamperingDetectedAt": null,
+   "alarmTriggeredAt": null,
+   "motionDetectedAt": null,
+   "upSince": 1765171438300,
+   "isAdopted": true,
+   "batteryStatus": {
+    "percentage": 97,
+    "isLow": false,
+    "modelKey": "sensorBatteryStatus"
+   },
+   "bluetoothConnectionState": {
+    "signalQuality": 17,
+    "signalStrength": -83,
+    "signalNoiseRatio": null,
+    "modelKey": "bluetoothConnectionState"
+   },
+   "stats": {
+    "light": {
+     "value": null,
+     "status": "unknown"
+    },
+    "humidity": {
+     "value": null,
+     "status": "unknown"
+    },
+    "temperature": {
+     "value": null,
+     "status": "unknown"
+    }
+   },
+   "featureFlags": {
+    "led": {
+     "channelCount": 1
+    },
+    "tamper": {
+     "channelCount": 1
+    },
+    "button": {
+     "channelCount": 1
+    },
+    "temperature": {
+     "channelCount": 1,
+     "range": {
+      "min": 0,
+      "max": 45
+     }
+    },
+    "humidity": {
+     "channelCount": 1
+    },
+    "light": {
+     "channelCount": 1
+    },
+    "motion": {
+     "channelCount": 1
+    },
+    "acceleration": {
+     "channelCount": 1
+    },
+    "waterLeak": {
+     "channelCount": 1,
+     "channelNames": [
+      "internal"
+     ]
+    },
+    "open": {
+     "channelCount": 1
+    },
+    "alarmTypes": [
+     "smoke",
+     "CO"
+    ],
+    "isBidirectional": true
+   },
+   "bridge": "fixture-bri-u6-lite",
+   "leakSettings": {
+    "isInternalEnabled": false,
+    "isExternalEnabled": false
+   },
+   "ledSettings": {
+    "isEnabled": false,
+    "activityFeedback": true
+   },
+   "mac": "000000000020",
+   "id": "fixture-sen-protect-sensor"
+  }
+ ],
+ "bridges": [
+  {
+   "name": "Example Bridge 1",
+   "type": "UFP-UAP-B",
+   "state": "CONNECTING",
+   "isConnected": false,
+   "lastSeen": 1763174704619,
+   "firmwareVersion": "2.2.0",
+   "isAdopted": true,
+   "upSince": 1762106578015,
+   "mac": "000000000030",
+   "id": "fixture-bri-basementap"
+  },
+  {
+   "name": "Example Bridge 2",
+   "type": "UFP-UAP-B",
+   "state": "CONNECTED",
+   "isConnected": true,
+   "lastSeen": 1785693800050,
+   "firmwareVersion": "2.2.0",
+   "isAdopted": true,
+   "upSince": 1782464562050,
+   "mac": "000000000031",
+   "id": "fixture-bri-u6-lite"
+  }
+ ]
+}

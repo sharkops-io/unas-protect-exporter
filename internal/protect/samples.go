@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"gitlab.com/sharkops/exporters/unas-protect-exporter/internal/metric"
+	"gitlab.com/sharkops/exporters/exporter-common/metric"
 )
 
 func b2f(b bool) float64 {

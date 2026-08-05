@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"gitlab.com/sharkops/exporters/unas-protect-exporter/internal/metric"
+	"gitlab.com/sharkops/exporters/exporter-common/metric"
 	"gitlab.com/sharkops/exporters/unas-protect-exporter/internal/protect"
 	"gitlab.com/sharkops/exporters/unas-protect-exporter/internal/unas"
 )

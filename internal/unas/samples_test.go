@@ -8,7 +8,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	promtestutil "github.com/prometheus/client_golang/prometheus/testutil"
 
-	"gitlab.com/sharkops/exporters/unas-protect-exporter/internal/testutil"
+	"gitlab.com/sharkops/exporters/exporter-common/testutil"
 )
 
 func collectorFor(t *testing.T, st *Storage, name string, now time.Time) prometheus.Collector {

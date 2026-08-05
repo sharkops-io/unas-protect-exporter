@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"gitlab.com/sharkops/exporters/unas-protect-exporter/internal/httpx"
+	"gitlab.com/sharkops/exporters/exporter-common/httpx"
 )
 
 func newTestClient(t *testing.T, h http.HandlerFunc) *Client {

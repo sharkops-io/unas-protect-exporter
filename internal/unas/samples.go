@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"gitlab.com/sharkops/exporters/unas-protect-exporter/internal/metric"
+	"gitlab.com/sharkops/exporters/exporter-common/metric"
 )
 
 // Samples maps a storage payload onto the metric set. Pure, with now

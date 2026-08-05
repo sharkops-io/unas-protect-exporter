@@ -11,7 +11,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	promtestutil "github.com/prometheus/client_golang/prometheus/testutil"
 
-	"gitlab.com/sharkops/exporters/unas-protect-exporter/internal/testutil"
+	"gitlab.com/sharkops/exporters/exporter-common/testutil"
 )
 
 // fixtureCameraID is the sole camera's id in testdata/bootstrap.json. The

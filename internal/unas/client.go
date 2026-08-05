@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"gitlab.com/sharkops/exporters/unas-protect-exporter/internal/httpx"
+	"gitlab.com/sharkops/exporters/exporter-common/httpx"
 )
 
 // Config is the exporter's UNAS connection config. Unlike another-app' version

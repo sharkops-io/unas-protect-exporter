@@ -8,6 +8,25 @@ in `CONTRIBUTING.md` — a renamed or removed metric name is a breaking change.
 
 ## [Unreleased]
 
+### Changed
+
+- `httpx`, `metric`, `collector` and `testutil` now come from the shared
+  [`exporter-common`](https://gitlab.com/sharkops/exporters/exporter-common)
+  module (v0.1.0) rather than living under `internal/`. Those four packages
+  were originally extracted *from* this repo to build `gameserver-exporter`;
+  this closes the loop so there is one copy rather than two drifting ones.
+
+  **No metric-surface change.** Verified by running the pre- and
+  post-migration binaries side by side against the live UNAS and Protect
+  console: all 200 `# HELP`/`# TYPE` lines identical in order, and all 175
+  series identities identical — including the four
+  `*_scrape_collector_*` self-monitoring series, the only ones whose
+  construction actually changed. `go run ./internal/tools/metricdoc` output is
+  byte-identical too.
+
+  `internal/config` deliberately stays here: roughly half of it is
+  UniFi-shaped and has no business in a device-agnostic module.
+
 ## [0.1.2] - 2026-08-04
 
 ### Fixed

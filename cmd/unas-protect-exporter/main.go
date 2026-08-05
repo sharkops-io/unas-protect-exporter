@@ -13,7 +13,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"gitlab.com/sharkops/exporters/unas-protect-exporter/internal/collector"
+	"gitlab.com/sharkops/exporters/exporter-common/collector"
 	"gitlab.com/sharkops/exporters/unas-protect-exporter/internal/config"
 	"gitlab.com/sharkops/exporters/unas-protect-exporter/internal/protect"
 	"gitlab.com/sharkops/exporters/unas-protect-exporter/internal/unas"

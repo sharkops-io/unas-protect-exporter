@@ -22,14 +22,16 @@ all when it was built against an older Go than `go.mod` targets, so the pin,
 
 - Golden exposition tests for both the `unas` and `protect` mappers — each
   asserts the exact Prometheus text output for a fixture, not just "no error".
-- Collector isolation, at two levels. `internal/collector` covers the
-  registry's view: a failing, panicking or duplicate-emitting collector must
-  not cost another collector its series.
-  `cmd/unas-protect-exporter/main_test.go` covers the same property where it
-  actually has to hold — a real GET against `/metrics`, asserting HTTP 200 and
-  the surviving families. Keep both. Every seam here was individually green
-  while the assembled endpoint returned an empty 500 for any gather error,
-  because nothing tested the assembly.
+- Collector isolation, at two levels. The registry's view — a failing,
+  panicking or duplicate-emitting collector must not cost another collector
+  its series — is covered by `collector` in the shared
+  [`exporter-common`](https://gitlab.com/sharkops/exporters/exporter-common)
+  module, which is where that package now lives. This repo still owns the half
+  that only it can test: `cmd/unas-protect-exporter/main_test.go` covers the
+  same property where it actually has to hold — a real GET against `/metrics`,
+  asserting HTTP 200 and the surviving families. Keep it. Every seam here was
+  individually green while the assembled endpoint returned an empty 500 for
+  any gather error, because nothing tested the assembly.
 - Session reuse (`internal/unifios`, `internal/protect`) — a scrape must not
   re-authenticate every interval.
 - Dashboard validation (`dashboards/dashboards_test.go`) — every PromQL query

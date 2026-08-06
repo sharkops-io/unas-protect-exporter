@@ -1,3 +1,9 @@
 /unas-protect-exporter
 /dist/
 *.test
+
+# Agent working artefacts. review-*.diff files under here embed whole diffs of
+# the code under review, which is how a credential ends up in one: the 2026-08-03
+# review diffs on this repo captured a UniFi password (since rotated, so those
+# copies are dead). They were never committed - this keeps it that way.
+.superpowers/

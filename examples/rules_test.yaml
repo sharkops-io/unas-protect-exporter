@@ -534,3 +534,118 @@ tests:
             exp_annotations:
               summary: "Protect metrics collection is failing"
               description: "The Protect collector has failed every scrape for 15m; all protect_* series are stale or absent."
+
+  # --- UNASRemoteBackupNeedsReauth: for 15m ---
+  - interval: 1m
+    input_series:
+      - series: 'unas_remote_backup_needs_reauth{task="Example to Cloud",task_id="t1"}'
+        values: '0+0x30'           # credential healthy throughout
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: UNASRemoteBackupNeedsReauth
+        exp_alerts: []
+
+  - interval: 1m
+    input_series:
+      - series: 'unas_remote_backup_needs_reauth{task="Example to Cloud",task_id="t1"}'
+        values: '1+0x30'           # grant expired
+    alert_rule_test:
+      - eval_time: 10m             # inside for: 15m - must NOT fire yet
+        alertname: UNASRemoteBackupNeedsReauth
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: UNASRemoteBackupNeedsReauth
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              task: Example to Cloud
+              task_id: t1
+            exp_annotations:
+              summary: "UNAS remote backup Example to Cloud needs re-authorisation"
+              description: "Task Example to Cloud has lost its remote credential. It is still scheduled and still enabled, but nothing is reaching the destination."
+
+  # --- UNASRemoteBackupFailed: keyed on the error COUNT, not the status ---
+  # A clean run is 0 error codes; the status label rides along for reading.
+  - interval: 1m
+    input_series:
+      - series: 'unas_remote_backup_last_run_error_count{task="Example to Cloud",task_id="t1"}'
+        values: '0+0x30'
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: UNASRemoteBackupFailed
+        exp_alerts: []
+
+  - interval: 1m
+    input_series:
+      - series: 'unas_remote_backup_last_run_error_count{task="Example to Cloud",task_id="t1"}'
+        values: '2+0x30'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: UNASRemoteBackupFailed
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: UNASRemoteBackupFailed
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              task: Example to Cloud
+              task_id: t1
+            exp_annotations:
+              summary: "UNAS remote backup Example to Cloud last run reported errors"
+              description: 'Task Example to Cloud finished with 2 error code(s); its last status was "".'
+
+  # --- UNASRemoteBackupCollectorFailing: the guard that keeps the rest honest ---
+  - interval: 1m
+    input_series:
+      - series: 'unas_remote_backup_scrape_collector_success'
+        values: '1+0x30'
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: UNASRemoteBackupCollectorFailing
+        exp_alerts: []
+
+  - interval: 1m
+    input_series:
+      - series: 'unas_remote_backup_scrape_collector_success'
+        values: '0+0x30'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: UNASRemoteBackupCollectorFailing
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: UNASRemoteBackupCollectorFailing
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "UNAS remote-backup collector is failing"
+              description: "The remote-backup collector cannot read the device. Every other unas_remote_backup alert is blind while this is firing - check the local account's credentials first, since that collector uses a cookie session rather than the API key."
+
+  # --- UNASRemoteBackupStale: for 15m, threshold 27h ---
+  # promtool's clock starts at epoch 0, so a last-run timestamp of 0 means the
+  # age at eval_time T is exactly T. That is what makes a 27h threshold
+  # testable at all without fabricating wall-clock times.
+  #
+  # interval MUST stay under Prometheus' 5m lookback delta. At 15m the series
+  # is stale at almost every eval time, the expression matches nothing, and the
+  # test fails while the ALERT is perfectly correct - a confusing way to lose
+  # an hour. 4m x 450 covers 30h with a sample always in lookback range.
+  - interval: 4m
+    input_series:
+      - series: 'unas_remote_backup_last_run_timestamp_seconds{task="Example to Cloud",task_id="t1"}'
+        values: '0+0x450'
+    alert_rule_test:
+      - eval_time: 26h             # 93600s < 97200s - not stale yet
+        alertname: UNASRemoteBackupStale
+        exp_alerts: []
+      - eval_time: 28h             # 100800s > 97200s, and past for: 15m
+        alertname: UNASRemoteBackupStale
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              task: Example to Cloud
+              task_id: t1
+            exp_annotations:
+              summary: "UNAS remote backup Example to Cloud has not run in over 27 hours"
+              description: "Task Example to Cloud last completed more than 27h ago. A daily task that stops running produces no failure of its own to alert on."
+

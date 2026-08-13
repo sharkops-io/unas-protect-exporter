@@ -2,6 +2,8 @@ package unas
 
 import (
 	"context"
+	"strconv"
+	"strings"
 	"time"
 
 	"gitlab.com/sharkops/exporters/exporter-common/metric"
@@ -83,6 +85,35 @@ func Samples(st *Storage, deviceName string, now time.Time) []metric.Sample {
 			metric.Gauge("unas_info", "UNAS device build info; always 1, read the labels.", 1,
 				map[string]string{"device": device, "model": di.Model, "firmware": di.FirmwareVersion, "version": di.Version}),
 		)
+		out = append(out,
+			metric.Gauge("unas_memory_free_bytes", "UNAS device free memory in bytes. Distinct from available, which includes reclaimable cache.", di.Memory.Free*1024, dl),
+			metric.Gauge("unas_device_status", "UNAS device status; always 1, read the status label.", 1,
+				map[string]string{"device": device, "status": di.Status}),
+			metric.Gauge("unas_sfp_aggregation_enabled", "Whether SFP+ link aggregation is enabled on the UNAS.", boolToFloat(di.SFPAggregation), dl),
+		)
+
+		for _, ni := range di.NetworkInterfaces {
+			il := map[string]string{"device": device, "interface": ni.Interface, "name": ni.InterfaceName}
+			out = append(out,
+				metric.Gauge("unas_network_interface_up", "Whether the UNAS network interface has a link.", boolToFloat(ni.Connected), il),
+			)
+			// Negotiated link speed, and the reason this metric earns its
+			// place: a 10 GbE SFP+ port that quietly renegotiates to 1 GbE
+			// halves backup throughput with nothing else reporting it.
+			//
+			// Omitted rather than zeroed when unparseable. LinkSpeed is ""
+			// on a port with no link, and a 0 there would be indistinguishable
+			// from a real 0 bit/s reading on a port that IS up.
+			if bits, ok := parseLinkSpeed(ni.LinkSpeed); ok {
+				out = append(out, metric.Gauge("unas_network_interface_link_speed_bits",
+					"Negotiated link speed of the UNAS network interface, in bits per second.", bits, il))
+			}
+			if bits, ok := parseLinkSpeed(ni.MaxSpeed); ok {
+				out = append(out, metric.Gauge("unas_network_interface_max_speed_bits",
+					"Maximum link speed the UNAS network interface supports, in bits per second.", bits, il))
+			}
+		}
+
 		// device-info can arrive without a parseable startupTime, so this stays
 		// a separate guard: it would otherwise read as a 56-year uptime.
 		if !di.StartupTime.IsZero() {
@@ -91,7 +122,62 @@ func Samples(st *Storage, deviceName string, now time.Time) []metric.Sample {
 		}
 	}
 
+	// Throughput is a separate best-effort fetch, so it gets its own guard
+	// rather than riding on HasDeviceInfo.
+	if st.HasNetworkIO {
+		nl := map[string]string{"device": deviceNameOrFallback(st, deviceName)}
+		out = append(out,
+			metric.Gauge("unas_network_receive_kbps", "UNAS device network receive throughput in kilobytes per second.", st.NetworkIO.ReceiveKBPS, nl),
+			metric.Gauge("unas_network_transmit_kbps", "UNAS device network transmit throughput in kilobytes per second.", st.NetworkIO.TransmitKBPS, nl),
+		)
+	}
+
 	return out
+}
+
+// deviceNameOrFallback resolves the device label when device-info may be
+// absent: network-io carries no device name of its own, and its fetch succeeds
+// independently of device-info's.
+func deviceNameOrFallback(st *Storage, fallback string) string {
+	if st.HasDeviceInfo && st.DeviceInfo.Name != "" {
+		return st.DeviceInfo.Name
+	}
+	return fallback
+}
+
+// parseLinkSpeed turns the device's human link-speed string into bits per
+// second. Reports ok=false for anything it does not recognise, so the caller
+// omits the sample rather than publishing a fabricated 0.
+//
+// Only three forms have been observed from a UNAS Pro: "10 GbE", "GbE" (which
+// means 1 GbE — the magnitude is implicit) and "" (no link). A bare unit with
+// an implied 1 is exactly the kind of shape that invites a parser to return 0,
+// so it is handled explicitly. Anything else — "2.5 GbE", "100 MbE", a future
+// spelling — is unrecognised on purpose: a wrong number here would silently
+// misreport the link, and a missing series is visible.
+func parseLinkSpeed(s string) (float64, bool) {
+	f := strings.Fields(strings.TrimSpace(s))
+	if len(f) == 0 {
+		return 0, false
+	}
+	mult := 1.0
+	switch f[len(f)-1] {
+	case "GbE":
+		mult = 1e9
+	case "MbE":
+		mult = 1e6
+	default:
+		return 0, false
+	}
+	if len(f) == 1 {
+		// "GbE" with no magnitude means 1 GbE.
+		return mult, true
+	}
+	n, err := strconv.ParseFloat(f[0], 64)
+	if err != nil {
+		return 0, false
+	}
+	return n * mult, true
 }
 
 // Source adapts a Client to collector.Source. The client is built once and

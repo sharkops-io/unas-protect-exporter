@@ -46,6 +46,13 @@ type Config struct {
 	UNAS        unas.Config
 	UNASName    string
 
+	// RemoteBackupEnabled gates the UNAS remote-backup collector. It is
+	// separate from UNASEnabled because it needs a different credential: the
+	// API key cannot read that endpoint (403 invalid auth user ID), only a
+	// cookie session can. Deliberately NOT a hard requirement — see the
+	// assignment in Parse.
+	RemoteBackupEnabled bool
+
 	ProtectEnabled bool
 	Protect        protect.Config
 	ProtectName    string
@@ -101,6 +108,10 @@ func Parse(args []string, getenv func(string) string) (*Config, error) {
 
 	app.Flag("unas.url", "UniFi OS URL of the UNAS.").StringVar(&cfg.UNAS.URL)
 	app.Flag("unas.api-key", "UNAS local API key.").StringVar(&cfg.UNAS.APIKey)
+	app.Flag("unas.username", "UNAS local account username. Optional; enables the remote-backup collector, which the API key cannot authenticate.").
+		StringVar(&cfg.UNAS.Username)
+	app.Flag("unas.password", "UNAS local account password. Optional; see --unas.username.").
+		StringVar(&cfg.UNAS.Password)
 	app.Flag("unas.name", "Fallback device label when the device reports no name.").StringVar(&cfg.UNASName)
 	app.Flag("unas.insecure-skip-verify", "Disable TLS verification for the UNAS.").BoolVar(&cfg.UNAS.InsecureSkipVerify)
 
@@ -137,6 +148,8 @@ func Parse(args []string, getenv func(string) string) (*Config, error) {
 	// so a flag always wins.
 	fallback(&cfg.UNAS.URL, getenv("UNAS_URL"))
 	fallback(&cfg.UNAS.APIKey, getenv("UNAS_API_KEY"))
+	fallback(&cfg.UNAS.Username, getenv("UNAS_USERNAME"))
+	fallback(&cfg.UNAS.Password, getenv("UNAS_PASSWORD"))
 	fallback(&cfg.UNASName, getenv("UNAS_NAME"))
 	fallback(&cfg.Protect.URL, getenv("PROTECT_URL"))
 	fallback(&cfg.Protect.Username, getenv("PROTECT_USERNAME"))
@@ -148,8 +161,20 @@ func Parse(args []string, getenv func(string) string) (*Config, error) {
 	cfg.UNASEnabled = *unasOn && cfg.UNAS.URL != ""
 	cfg.ProtectEnabled = *protectOn && cfg.Protect.URL != ""
 
+	// Opt-in by credential presence, NOT an error when absent. This exporter
+	// is public and every existing deployment has only an API key; making the
+	// session credentials mandatory would turn an upgrade into an outage for
+	// them. With no username/password the storage collector runs exactly as
+	// before and only remote-backup is skipped.
+	cfg.RemoteBackupEnabled = cfg.UNASEnabled && cfg.UNAS.Username != "" && cfg.UNAS.Password != ""
+
 	if cfg.UNASEnabled && cfg.UNAS.APIKey == "" {
 		return nil, fmt.Errorf("unas.url is set but unas.api-key is empty")
+	}
+	// One half of a credential pair is a typo, not a choice, and silently
+	// disabling the collector would hide it.
+	if cfg.UNASEnabled && (cfg.UNAS.Username == "") != (cfg.UNAS.Password == "") {
+		return nil, fmt.Errorf("unas.username and unas.password must be set together")
 	}
 	if cfg.ProtectEnabled && (cfg.Protect.Username == "" || cfg.Protect.Password == "") {
 		return nil, fmt.Errorf("protect.url is set but protect.username or protect.password is empty")

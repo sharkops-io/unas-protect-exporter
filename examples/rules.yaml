@@ -240,3 +240,59 @@ groups:
         annotations:
           summary: "Protect reports a healthy scrape but no sensors"
           description: "protect_sensor_up has been absent for 15m while protect_scrape_collector_success reads 1. The collector is scraping successfully and returning no sensors — most likely the device payload changed shape. Any leak, tamper or battery alerting built on this series is silently unable to fire until this is fixed."
+
+  # Offsite backup tasks. Every rule here is task-agnostic on purpose: the
+  # `task` label names the offender, so adding a seventh backup task needs no
+  # change to any expression. Hardcoding task names would drift the first time
+  # one is renamed, and a renamed task would silently stop being alerted on.
+  - name: unas-remote-backup
+    rules:
+      # The silent killer. An expired OAuth grant leaves the task configured,
+      # the schedule enabled and the next-run time ticking forward, while
+      # nothing is written to the destination. Nothing else reports it.
+      - alert: UNASRemoteBackupNeedsReauth
+        expr: unas_remote_backup_needs_reauth == 1
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "UNAS remote backup {{ $labels.task }} needs re-authorisation"
+          description: "Task {{ $labels.task }} has lost its remote credential. It is still scheduled and still enabled, but nothing is reaching the destination."
+
+      # Keyed on the error COUNT, not the status string. Only "succeeded" has
+      # ever been observed from the device, so the spellings of its failure and
+      # in-flight states are unknown - and a count needs no knowledge of them.
+      # unas_remote_backup_last_run_status carries the raw string as a label
+      # for reading, never for matching.
+      - alert: UNASRemoteBackupFailed
+        expr: unas_remote_backup_last_run_error_count > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "UNAS remote backup {{ $labels.task }} last run reported errors"
+          description: 'Task {{ $labels.task }} finished with {{ $value }} error code(s); its last status was "{{ $labels.status }}".'
+
+      # 27h: every task observed runs daily, and the longest takes over three
+      # hours, so this clears a normal long run comfortably.
+      - alert: UNASRemoteBackupStale
+        expr: time() - unas_remote_backup_last_run_timestamp_seconds > 97200
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "UNAS remote backup {{ $labels.task }} has not run in over 27 hours"
+          description: "Task {{ $labels.task }} last completed more than 27h ago. A daily task that stops running produces no failure of its own to alert on."
+
+      # Without this, the three rules above go SILENT rather than firing when
+      # the collector cannot reach the device - a rotated password or a locked
+      # account would look exactly like healthy backups. The gauge is emitted
+      # by the exporter itself, so it survives the device being unreachable.
+      - alert: UNASRemoteBackupCollectorFailing
+        expr: unas_remote_backup_scrape_collector_success == 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "UNAS remote-backup collector is failing"
+          description: "The remote-backup collector cannot read the device. Every other unas_remote_backup alert is blind while this is firing - check the local account's credentials first, since that collector uses a cookie session rather than the API key."

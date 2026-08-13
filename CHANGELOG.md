@@ -8,6 +8,8 @@ in `CONTRIBUTING.md` — a renamed or removed metric name is a breaking change.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-13
+
 ### Added
 
 - **UNAS remote-backup collector.** Scrapes
@@ -63,6 +65,21 @@ in `CONTRIBUTING.md` — a renamed or removed metric name is a breaking change.
   Note these are device-computed **rates**, not monotonic counters: they
   cannot be `rate()`d and a scrape gap loses that interval. That is what the
   endpoint offers, and is already true of `unas_disk_read_kbps`.
+
+- Example alerting rules for the remote-backup collector in
+  `examples/rules.yaml`, with `promtool` unit tests asserting both sides of
+  every `for:`. All four are task-agnostic: the `task` label names the
+  offender, so adding a backup task needs no rule change.
+
+  `UNASRemoteBackupCollectorFailing` is the one that keeps the other three
+  honest. Without it a rotated password or a locked account makes the
+  collector fail and every remote-backup alert go silent, which is
+  indistinguishable from healthy backups.
+
+  Note for anyone writing more of these: an `input_series` interval above
+  Prometheus' 5m lookback delta leaves the series stale at eval time, so the
+  expression matches nothing and the TEST fails while the ALERT is correct.
+  The 27h staleness test uses a 4m interval for exactly that reason.
 
 ### Changed
 

@@ -2016,6 +2016,9 @@
                 "value": 97200
               }
             ]
+          },
+          "color": {
+            "mode": "palette-classic-by-name"
           }
         },
         "overrides": []
@@ -2065,6 +2068,9 @@
             "fillOpacity": 0,
             "lineWidth": 1,
             "showPoints": "never"
+          },
+          "color": {
+            "mode": "palette-classic-by-name"
           }
         },
         "overrides": []

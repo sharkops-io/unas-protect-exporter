@@ -1994,7 +1994,7 @@
         "x": 15,
         "y": 56
       },
-      "description": "Sawtooth is healthy - each nightly run resets it. A line that climbs without resetting is a task that has stopped running.",
+      "description": "Sawtooth is healthy - each nightly run resets it. A line that climbs without resetting is a task that has stopped running. Aggregated by task: without it the scrape labels (pod, instance, container, endpoint) ride along and a pod restart draws a second line per task.",
       "fieldConfig": {
         "defaults": {
           "unit": "s",
@@ -2039,7 +2039,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "time() - unas_remote_backup_last_run_timestamp_seconds",
+          "expr": "time() - max by (task) (unas_remote_backup_last_run_timestamp_seconds)",
           "refId": "A",
           "legendFormat": "{{task}}"
         }
@@ -2059,7 +2059,7 @@
         "x": 0,
         "y": 61
       },
-      "description": "How long each task's last run took. Worth watching for creep: the longhorn task already runs over three hours.",
+      "description": "How long each task's last run took. Worth watching for creep: the longhorn task already runs over three hours. Aggregated by task: without it the scrape labels (pod, instance, container, endpoint) ride along and a pod restart draws a second line per task.",
       "fieldConfig": {
         "defaults": {
           "unit": "s",
@@ -2093,7 +2093,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "unas_remote_backup_last_run_duration_seconds",
+          "expr": "max by (task) (unas_remote_backup_last_run_duration_seconds)",
           "refId": "A",
           "legendFormat": "{{task}}"
         }

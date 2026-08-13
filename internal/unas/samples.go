@@ -160,7 +160,11 @@ func parseLinkSpeed(s string) (float64, bool) {
 	if len(f) == 0 {
 		return 0, false
 	}
-	mult := 1.0
+	// Declared without an initialiser on purpose: every branch below either
+	// assigns it or returns, so seeding it with 1.0 would be an ineffectual
+	// assignment AND would quietly become the fallback if a future branch
+	// forgot to set it.
+	var mult float64
 	switch f[len(f)-1] {
 	case "GbE":
 		mult = 1e9

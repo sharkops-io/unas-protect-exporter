@@ -47,9 +47,15 @@ func emitted(t *testing.T) (names map[string]bool, labels map[string]map[string]
 	for _, s := range protect.Samples(protect.FixtureBootstrap(t), "fallback") {
 		record(s.Name, s.Labels)
 	}
+	for _, s := range unas.RemoteBackupSamples(unas.FixtureRemoteBackupTasks(), time.Now()) {
+		record(s.Name, s.Labels)
+	}
 
 	// The collector wrapper's own series are emitted outside the mappers.
-	for _, ns := range []string{"unas", "protect"} {
+	// unas_remote_backup is a third namespace, not a typo: that collector runs
+	// under its own so its scrape_collector gauges are not label-identical to
+	// the storage collector's. See unas.RemoteBackupSource.Namespace.
+	for _, ns := range []string{"unas", "protect", "unas_remote_backup"} {
 		record(ns+"_scrape_collector_success", nil)
 		record(ns+"_scrape_collector_duration_seconds", nil)
 	}

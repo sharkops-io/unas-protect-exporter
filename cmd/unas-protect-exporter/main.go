@@ -75,6 +75,19 @@ func buildRegistry(cfg *config.Config) (*prometheus.Registry, error) {
 		slog.Info("unas collector enabled", "url", cfg.UNAS.URL)
 	}
 
+	// A second collector against the SAME device, with a different credential.
+	// See internal/unas/remotebackup.go for why the API key cannot serve this
+	// endpoint, and RemoteBackupSource.Namespace for why it does not share the
+	// "unas" namespace.
+	if cfg.RemoteBackupEnabled {
+		client, err := unas.NewRemoteBackup(cfg.UNAS)
+		if err != nil {
+			return nil, fmt.Errorf("unas remote-backup client: %w", err)
+		}
+		reg.MustRegister(collector.New(&unas.RemoteBackupSource{Client: client}, cfg.Timeout))
+		slog.Info("unas remote-backup collector enabled", "url", cfg.UNAS.URL)
+	}
+
 	if cfg.ProtectEnabled {
 		client, err := protect.New(cfg.Protect)
 		if err != nil {

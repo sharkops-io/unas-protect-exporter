@@ -51,11 +51,17 @@ func main() {
 
 	add(unas.Samples(unas.FixtureStorage(), "example", time.Now()))
 	add(protect.Samples(protect.FixtureBootstrap(fatal{}), "example"))
+	add(unas.RemoteBackupSamples(unas.FixtureRemoteBackupTasks(), time.Now()))
 	add([]metric.Sample{
 		metric.Gauge("unas_scrape_collector_success", "Whether the last collection for this collector succeeded (1) or failed (0).", 1, nil),
 		metric.Gauge("unas_scrape_collector_duration_seconds", "Duration of the last collection for this collector, in seconds.", 0, nil),
 		metric.Gauge("protect_scrape_collector_success", "Whether the last collection for this collector succeeded (1) or failed (0).", 1, nil),
 		metric.Gauge("protect_scrape_collector_duration_seconds", "Duration of the last collection for this collector, in seconds.", 0, nil),
+		// The remote-backup collector runs under its own namespace rather than
+		// "unas" — see unas.RemoteBackupSource.Namespace — so it produces a
+		// third pair of these, which no mapper fixture emits either.
+		metric.Gauge("unas_remote_backup_scrape_collector_success", "Whether the last collection for this collector succeeded (1) or failed (0).", 1, nil),
+		metric.Gauge("unas_remote_backup_scrape_collector_duration_seconds", "Duration of the last collection for this collector, in seconds.", 0, nil),
 		// protect_camera_wifi_signal_{quality,strength_dbm}: real, shipped
 		// metrics (samples.go) that only emit while a camera IsConnected. The
 		// fixture's sole camera is pinned disconnected on purpose (see

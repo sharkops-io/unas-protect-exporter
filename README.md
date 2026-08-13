@@ -157,6 +157,7 @@ else below is literally the generator's output, unedited.
 | `protect_sensor_up` | gauge | `mount_type`, `sensor`, `type` | Whether the sensor is connected to Protect. |
 | `unas_cpu_load_ratio` | gauge | `device` | UNAS device CPU load, 0-1. |
 | `unas_cpu_temperature_celsius` | gauge | `device` | UNAS device CPU temperature in degrees Celsius. |
+| `unas_device_status` | gauge | `device`, `status` | UNAS device status; always 1, read the status label. |
 | `unas_disk_bad_sector_count_total` | counter | `serial`, `slot` | UNAS disk SMART bad sector count. |
 | `unas_disk_health_score` | gauge | `model`, `serial`, `slot`, `type` | UNAS disk health score, 0-5 as reported by the device. |
 | `unas_disk_power_on_hours` | gauge | `serial`, `slot` | UNAS disk SMART power-on hours. |
@@ -169,17 +170,33 @@ else below is literally the generator's output, unedited.
 | `unas_disk_write_kbps` | gauge | `serial`, `slot` | UNAS disk write throughput in kilobytes per second. |
 | `unas_info` | gauge | `device`, `firmware`, `model`, `version` | UNAS device build info; always 1, read the labels. |
 | `unas_memory_available_bytes` | gauge | `device` | UNAS device available memory in bytes. |
+| `unas_memory_free_bytes` | gauge | `device` | UNAS device free memory in bytes. Distinct from available, which includes reclaimable cache. |
 | `unas_memory_total_bytes` | gauge | `device` | UNAS device total memory in bytes. |
+| `unas_network_interface_link_speed_bits` | gauge | `device`, `interface`, `name` | Negotiated link speed of the UNAS network interface, in bits per second. |
+| `unas_network_interface_max_speed_bits` | gauge | `device`, `interface`, `name` | Maximum link speed the UNAS network interface supports, in bits per second. |
+| `unas_network_interface_up` | gauge | `device`, `interface`, `name` | Whether the UNAS network interface has a link. |
+| `unas_network_receive_kbps` | gauge | `device` | UNAS device network receive throughput in kilobytes per second. |
+| `unas_network_transmit_kbps` | gauge | `device` | UNAS device network transmit throughput in kilobytes per second. |
 | `unas_pool_capacity_bytes` | gauge | `pool` | UNAS storage pool capacity in bytes. |
 | `unas_pool_current_protection` | gauge | `pool`, `raid_group` | Disk failures the RAID group can currently absorb. |
 | `unas_pool_expected_protection` | gauge | `pool`, `raid_group` | Disk failures the RAID group is configured to absorb. |
 | `unas_pool_scrub_progress_ratio` | gauge | `pool` | UNAS storage pool data-scrub progress, 0-1. |
 | `unas_pool_status` | gauge | `pool`, `status` | UNAS storage pool status; always 1, read the status label. |
 | `unas_pool_used_bytes` | gauge | `pool` | UNAS storage pool bytes in use. |
+| `unas_remote_backup_enabled` | gauge | `task_id`, `task` | Whether the UNAS remote-backup task's schedule is enabled. |
+| `unas_remote_backup_last_run_duration_seconds` | gauge | `task_id`, `task` | Seconds the UNAS remote-backup task's last run took. |
+| `unas_remote_backup_last_run_error_count` | gauge | `task_id`, `task` | Number of error codes on the UNAS remote-backup task's last run. 0 is a clean run. |
+| `unas_remote_backup_last_run_status` | gauge | `status`, `task_id`, `task` | UNAS remote-backup task's last run status; always 1, read the status label. |
+| `unas_remote_backup_last_run_timestamp_seconds` | gauge | `task_id`, `task` | Unix timestamp when the UNAS remote-backup task's last run finished. |
+| `unas_remote_backup_needs_reauth` | gauge | `task_id`, `task` | Whether the UNAS remote-backup task needs its remote credentials re-authorised. 1 means the destination is no longer being written to. |
+| `unas_remote_backup_next_run_timestamp_seconds` | gauge | `task_id`, `task` | Unix timestamp of the UNAS remote-backup task's next scheduled run. |
+| `unas_remote_backup_scrape_collector_duration_seconds` | gauge |  | Duration of the last collection for this collector, in seconds. |
+| `unas_remote_backup_scrape_collector_success` | gauge |  | Whether the last collection for this collector succeeded (1) or failed (0). |
+| `unas_remote_backup_task_info` | gauge | `destination`, `task_id`, `task`, `type` | UNAS remote-backup task; always 1, read the labels. |
 | `unas_scrape_collector_duration_seconds` | gauge |  | Duration of the last collection for this collector, in seconds. |
 | `unas_scrape_collector_success` | gauge |  | Whether the last collection for this collector succeeded (1) or failed (0). |
+| `unas_sfp_aggregation_enabled` | gauge | `device` | Whether SFP+ link aggregation is enabled on the UNAS. |
 | `unas_uptime_seconds` | gauge | `device` | Seconds since the UNAS device booted. |
-
 The table above covers the series this exporter *maps from device payloads*.
 The endpoint also serves three families it does not generate itself, which are
 worth knowing about before you write a recording rule or a cardinality budget

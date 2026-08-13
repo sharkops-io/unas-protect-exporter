@@ -18,19 +18,29 @@ import (
 // such history, and the flag itself is phrased negatively, so a plain bool
 // whose zero value means "verify" is correct here.
 type Config struct {
-	URL                string
-	APIKey             string
+	URL    string
+	APIKey string
+	// Username and Password authenticate a UniFi OS cookie session, which the
+	// remote-backup collector needs and the API key cannot provide (see
+	// remotebackup.go). They are OPTIONAL: with the API key alone the storage
+	// collector works exactly as before, and only the remote-backup collector
+	// is skipped. Making them required would break every existing deployment
+	// of this exporter on upgrade.
+	Username           string
+	Password           string
 	InsecureSkipVerify bool
 	// Timeout bounds each individual HTTP request. Zero falls back to
 	// httpx.DefaultTimeout. It is distinct from the collector timeout, which
-	// bounds a whole scrape: GetStorage makes two requests, so the collector
-	// timeout must exceed twice this for both to be reachable.
+	// bounds a whole scrape: GetStorage makes THREE requests (storage,
+	// device-info, network-io), so the collector timeout must exceed three
+	// times this for all of them to be reachable.
 	Timeout time.Duration
 }
 
 const (
 	storagePath    = "/proxy/drive/api/v2/storage"
 	deviceInfoPath = "/proxy/drive/api/v2/systems/device-info"
+	networkIOPath  = "/proxy/drive/api/v2/systems/network-io"
 )
 
 // Storage is the typed view of the storage + device-info payloads used by the
@@ -50,6 +60,11 @@ type Storage struct {
 	// DeviceInfo: a zero-valued DeviceInfo is indistinguishable from a real
 	// reading of 0 °C / 0 bytes, and Prometheus never retracts a recorded sample.
 	HasDeviceInfo bool `json:"-"`
+	// NetworkIO and HasNetworkIO follow exactly the DeviceInfo contract above:
+	// best-effort, and a zero value is indistinguishable from a genuinely idle
+	// link, so callers MUST check the flag.
+	NetworkIO    NetworkIO `json:"-"`
+	HasNetworkIO bool      `json:"-"`
 }
 
 type Pool struct {
@@ -134,6 +149,35 @@ type DeviceInfo struct {
 		Free      float64 `json:"free"`
 		Available float64 `json:"available"`
 	} `json:"memory"`
+	// Status is a device-defined enum string, e.g. "STATE_RUNNING". Carried as
+	// a label rather than decoded, per the unas_pool_status convention.
+	Status            string             `json:"status"`
+	SFPAggregation    bool               `json:"sfpAggregation"`
+	NetworkInterfaces []NetworkInterface `json:"networkInterfaces"`
+}
+
+// NetworkInterface is one physical port. Address and MAC appear only on a
+// connected interface, so neither may be relied on.
+//
+// MaxSpeed and LinkSpeed are HUMAN STRINGS ("10 GbE", "GbE", ""), not numbers.
+// LinkSpeed is empty when the port has no link — which is why parseLinkSpeed
+// reports "no value" rather than 0 for it. See samples.go.
+type NetworkInterface struct {
+	Interface     string `json:"interface"`
+	InterfaceName string `json:"interfaceName"`
+	Connected     bool   `json:"connected"`
+	MaxSpeed      string `json:"maxSpeed"`
+	LinkSpeed     string `json:"linkSpeed"`
+}
+
+// NetworkIO is the device's instantaneous throughput sample.
+//
+// These are RATES the device computes itself, not monotonic counters, so they
+// cannot be rate()'d and a scrape gap loses that interval permanently. That is
+// what the endpoint offers; the same is already true of unas_disk_read_kbps.
+type NetworkIO struct {
+	ReceiveKBPS  float64 `json:"receiveKBPS"`
+	TransmitKBPS float64 `json:"transmitKBPS"`
 }
 
 type Client struct {
@@ -207,6 +251,17 @@ func (c *Client) GetStorage(ctx context.Context) (*Storage, error) {
 			st.HasDeviceInfo = true
 		} else {
 			st.DeviceInfo = DeviceInfo{}
+		}
+	}
+
+	// Same contract as device-info directly above: best-effort, and decoded
+	// only as a whole. A zero-valued NetworkIO reads as a genuinely idle link
+	// rather than as missing data, so the flag is what callers check.
+	if ioBytes, ioErr := c.get(ctx, networkIOPath); ioErr == nil {
+		if err := json.Unmarshal(ioBytes, &st.NetworkIO); err == nil {
+			st.HasNetworkIO = true
+		} else {
+			st.NetworkIO = NetworkIO{}
 		}
 	}
 

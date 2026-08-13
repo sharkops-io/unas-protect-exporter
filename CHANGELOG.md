@@ -8,6 +8,62 @@ in `CONTRIBUTING.md` — a renamed or removed metric name is a breaking change.
 
 ## [Unreleased]
 
+### Added
+
+- **UNAS remote-backup collector.** Scrapes
+  `/proxy/drive/api/v1/remote-backup/tasks` and reports the state of the
+  device's scheduled syncs to an external destination such as Google Drive:
+  `unas_remote_backup_task_info`, `_enabled`, `_needs_reauth`,
+  `_last_run_status`, `_last_run_error_count`, `_last_run_timestamp_seconds`,
+  `_last_run_duration_seconds` and `_next_run_timestamp_seconds`.
+
+  `needs_reauth` is the one to alert on. An expired OAuth grant is how an
+  offsite backup dies silently: the task stays configured, the schedule stays
+  enabled, and nothing ships.
+
+  **This collector needs a username and password, not the API key.** The
+  static `X-API-KEY` returns `403 invalid auth user ID` on that endpoint —
+  remote-backup tasks are per-user records — so it authenticates with a UniFi
+  OS cookie session via the existing `internal/unifios`, against the same host
+  the API-key client uses. One device, two credentials, neither able to reach
+  the other's endpoints.
+
+  Set `--unas.username`/`--unas.password` (or `UNAS_USERNAME`/`UNAS_PASSWORD`)
+  to enable it. **They are optional**: with the API key alone every existing
+  metric is unchanged and only this collector is skipped, so upgrading without
+  them is a no-op. Setting exactly one of the pair is rejected as a typo.
+
+  No success/failure boolean is derived from the run status. Only `succeeded`
+  has been observed from the device, so the status is carried as a label and
+  `_last_run_error_count` — a length, needing no knowledge of the device's
+  failure vocabulary — is the numeric signal.
+
+  This collector uses its own `unas_remote_backup` namespace rather than
+  sharing `unas`, because two collectors under one namespace emit
+  label-identical `<ns>_scrape_collector_success` gauges that the registry
+  accepts and Prometheus then reports as a duplicate-series gather error.
+
+- **UNAS network throughput and interface metrics**, from
+  `/proxy/drive/api/v2/systems/network-io` and the previously unmapped fields
+  of `device-info`: `unas_network_receive_kbps`, `unas_network_transmit_kbps`,
+  `unas_network_interface_up`, `unas_network_interface_link_speed_bits`,
+  `unas_network_interface_max_speed_bits`, `unas_device_status`,
+  `unas_sfp_aggregation_enabled` and `unas_memory_free_bytes`.
+
+  The link-speed pair exists to catch a 10 GbE port quietly renegotiating to
+  1 GbE, which halves throughput with nothing else reporting it. The device
+  reports speeds as human strings (`"10 GbE"`, `"GbE"` meaning 1 GbE, `""`
+  for no link), so they are parsed; anything unrecognised is **omitted rather
+  than published as 0**, since a 0 there is indistinguishable from a real
+  reading on a port that is up.
+
+  `network-io` is a third best-effort request inside `GetStorage`. Raise
+  `--collector.timeout` to more than three times `--http.timeout`, not twice.
+
+  Note these are device-computed **rates**, not monotonic counters: they
+  cannot be `rate()`d and a scrape gap loses that interval. That is what the
+  endpoint offers, and is already true of `unas_disk_read_kbps`.
+
 ### Changed
 
 - `httpx`, `metric`, `collector` and `testutil` now come from the shared

@@ -6,7 +6,7 @@ require (
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/prometheus/client_golang v1.24.1
 	github.com/prometheus/prometheus v0.313.2
-	gitlab.com/sharkops/exporters/exporter-common v0.1.0
+	gitlab.com/sharkops/exporters/exporter-common v0.2.0
 )
 
 require (

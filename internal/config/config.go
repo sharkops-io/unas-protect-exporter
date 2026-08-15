@@ -1,46 +1,24 @@
-// Package config binds this exporter's flags, each with an environment
-// fallback so a Helm values file can stay declarative.
+// Package config binds this exporter's device flags. The flags every exporter
+// in this family shares live in exporter-common/config, which this embeds.
 package config
 
 import (
-	"errors"
 	"fmt"
-	"io"
-	"log/slog"
-	"time"
 
 	"github.com/alecthomas/kingpin/v2"
+
+	common "gitlab.com/sharkops/exporters/exporter-common/config"
 
 	"gitlab.com/sharkops/exporters/unas-protect-exporter/internal/protect"
 	"gitlab.com/sharkops/exporters/unas-protect-exporter/internal/unas"
 )
 
-// ErrHelpRequested is returned by Parse when the user passed --help. It is
-// not a configuration error — kingpin has already written the usage text to
-// its usage writer — so a caller must check for it with errors.Is and exit 0,
-// rather than treating it like every other Parse error (which means "print
-// this and exit 1").
-//
-// This exists because Parse calls app.Terminate(nil): kingpin's own
-// os.Exit(0)-on-help behavior is disabled on purpose, so that Parse stays
-// callable from a test without ending the test binary's process. With
-// terminate turned into a no-op, kingpin's Parse falls through --help
-// exactly like an empty command line and returns a zero-value Config with a
-// nil error — indistinguishable, to a caller, from "the user ran this with
-// no flags at all", which cmd/unas-protect-exporter's "no collectors
-// enabled" check correctly treats as a fatal misconfiguration. That check is
-// load-bearing (an exporter with nothing configured must fail loudly rather
-// than serve an empty /metrics forever), so it cannot simply be relaxed;
-// --help needs its own, distinct signal instead.
-var ErrHelpRequested = errors.New("help requested")
+// ErrHelpRequested is re-exported so callers need not import the shared
+// package just to check one sentinel.
+var ErrHelpRequested = common.ErrHelpRequested
 
 type Config struct {
-	ListenAddress string
-	TelemetryPath string
-	Timeout       time.Duration
-
-	LogLevel  slog.Level
-	LogFormat string
+	*common.Base
 
 	UNASEnabled bool
 	UNAS        unas.Config
@@ -58,50 +36,13 @@ type Config struct {
 	ProtectName    string
 }
 
-// LogHandler builds the slog handler --log.level and --log.format select.
-// "logfmt" maps to slog's TextHandler, whose key=value output is the logfmt
-// the Prometheus toolkit's own flag of this name produces.
-func (c *Config) LogHandler(w io.Writer) slog.Handler {
-	opts := &slog.HandlerOptions{Level: c.LogLevel}
-	if c.LogFormat == "json" {
-		return slog.NewJSONHandler(w, opts)
-	}
-	return slog.NewTextHandler(w, opts)
-}
-
 // Parse builds a Config from args and the environment. getenv is injected so
 // the precedence rules are testable without touching the real environment.
 func Parse(args []string, getenv func(string) string) (*Config, error) {
 	app := kingpin.New("unas-protect-exporter", "Prometheus exporter for UniFi UNAS and UniFi Protect.")
-	app.Terminate(nil)
+	base := common.Register(app, common.Defaults{ListenAddress: ":9101"})
 
-	// Track --help explicitly (see ErrHelpRequested) rather than relying on
-	// kingpin's own exit behavior, which is disabled above.
-	var helpRequested bool
-	app.HelpFlag.IsSetByUser(&helpRequested)
-
-	var cfg Config
-
-	app.Flag("web.listen-address", "Address to listen on.").Default(":9101").StringVar(&cfg.ListenAddress)
-	app.Flag("web.telemetry-path", "Path under which to expose metrics.").Default("/metrics").StringVar(&cfg.TelemetryPath)
-	app.Flag("collector.timeout", "Per-collector timeout for a whole scrape. Keep below Prometheus' scrape_timeout.").
-		Default("25s").DurationVar(&cfg.Timeout)
-	// Two different clocks, and both have to be raised to give a slow device
-	// more time. --collector.timeout bounds a collector's whole scrape (which
-	// is several requests: the UNAS side fetches storage AND device-info, the
-	// Protect side may log in before fetching the bootstrap), while
-	// --http.timeout bounds each individual request. Before this flag existed
-	// the per-request cap was hard-wired at 10s and silently overrode any
-	// larger --collector.timeout.
-	var httpTimeout time.Duration
-	app.Flag("http.timeout", "Per-HTTP-request timeout. Raise this too when raising --collector.timeout.").
-		Default("10s").DurationVar(&httpTimeout)
-
-	var logLevel string
-	app.Flag("log.level", "Log level: debug, info, warn or error.").Default("info").
-		EnumVar(&logLevel, "debug", "info", "warn", "error")
-	app.Flag("log.format", "Log output format: logfmt or json.").Default("logfmt").
-		EnumVar(&cfg.LogFormat, "logfmt", "json")
+	cfg := Config{Base: base}
 
 	unasOn := app.Flag("collector.unas", "Enable the UNAS collector.").Default("true").Bool()
 	protectOn := app.Flag("collector.protect", "Enable the Protect collector.").Default("true").Bool()
@@ -121,51 +62,34 @@ func Parse(args []string, getenv func(string) string) (*Config, error) {
 	app.Flag("protect.name", "Fallback device label when the console reports no name.").StringVar(&cfg.ProtectName)
 	app.Flag("protect.insecure-skip-verify", "Disable TLS verification for the Protect console.").BoolVar(&cfg.Protect.InsecureSkipVerify)
 
-	if _, err := app.Parse(args); err != nil {
+	if err := common.Parse(app, base, args); err != nil {
 		return nil, err
 	}
-	if helpRequested {
-		return nil, ErrHelpRequested
-	}
 
-	// EnumVar already rejected anything else, so this cannot fail silently
-	// into a wrong level.
-	switch logLevel {
-	case "debug":
-		cfg.LogLevel = slog.LevelDebug
-	case "warn":
-		cfg.LogLevel = slog.LevelWarn
-	case "error":
-		cfg.LogLevel = slog.LevelError
-	default:
-		cfg.LogLevel = slog.LevelInfo
-	}
-
-	cfg.UNAS.Timeout = httpTimeout
-	cfg.Protect.Timeout = httpTimeout
+	cfg.UNAS.Timeout = base.HTTPTimeout
+	cfg.Protect.Timeout = base.HTTPTimeout
 
 	// Environment fallback: applied only where the flag left the value empty,
 	// so a flag always wins.
-	fallback(&cfg.UNAS.URL, getenv("UNAS_URL"))
-	fallback(&cfg.UNAS.APIKey, getenv("UNAS_API_KEY"))
-	fallback(&cfg.UNAS.Username, getenv("UNAS_USERNAME"))
-	fallback(&cfg.UNAS.Password, getenv("UNAS_PASSWORD"))
-	fallback(&cfg.UNASName, getenv("UNAS_NAME"))
-	fallback(&cfg.Protect.URL, getenv("PROTECT_URL"))
-	fallback(&cfg.Protect.Username, getenv("PROTECT_USERNAME"))
-	fallback(&cfg.Protect.Password, getenv("PROTECT_PASSWORD"))
-	fallback(&cfg.ProtectName, getenv("PROTECT_NAME"))
+	common.Fallback(&cfg.UNAS.URL, getenv("UNAS_URL"))
+	common.Fallback(&cfg.UNAS.APIKey, getenv("UNAS_API_KEY"))
+	common.Fallback(&cfg.UNAS.Username, getenv("UNAS_USERNAME"))
+	common.Fallback(&cfg.UNAS.Password, getenv("UNAS_PASSWORD"))
+	common.Fallback(&cfg.UNASName, getenv("UNAS_NAME"))
+	common.Fallback(&cfg.Protect.URL, getenv("PROTECT_URL"))
+	common.Fallback(&cfg.Protect.Username, getenv("PROTECT_USERNAME"))
+	common.Fallback(&cfg.Protect.Password, getenv("PROTECT_PASSWORD"))
+	common.Fallback(&cfg.ProtectName, getenv("PROTECT_NAME"))
 
-	// A collector runs when it is not disabled AND has somewhere to connect to,
-	// so either half can be left unconfigured without a flag.
+	// A collector runs when it is not disabled AND has somewhere to connect
+	// to, so either half can be left unconfigured without a flag.
 	cfg.UNASEnabled = *unasOn && cfg.UNAS.URL != ""
 	cfg.ProtectEnabled = *protectOn && cfg.Protect.URL != ""
 
 	// Opt-in by credential presence, NOT an error when absent. This exporter
 	// is public and every existing deployment has only an API key; making the
 	// session credentials mandatory would turn an upgrade into an outage for
-	// them. With no username/password the storage collector runs exactly as
-	// before and only remote-backup is skipped.
+	// them.
 	cfg.RemoteBackupEnabled = cfg.UNASEnabled && cfg.UNAS.Username != "" && cfg.UNAS.Password != ""
 
 	if cfg.UNASEnabled && cfg.UNAS.APIKey == "" {
@@ -181,10 +105,4 @@ func Parse(args []string, getenv func(string) string) (*Config, error) {
 	}
 
 	return &cfg, nil
-}
-
-func fallback(dst *string, env string) {
-	if *dst == "" {
-		*dst = env
-	}
 }

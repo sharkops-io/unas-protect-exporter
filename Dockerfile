@@ -4,7 +4,7 @@
 # architecture for the entire compile, which is slow; and if GOOS/GOARCH are not
 # then wired from TARGETOS/TARGETARCH the binary comes out for the WRONG
 # architecture, which fails only at container start with "exec format error".
-FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS build
+FROM --platform=$BUILDPLATFORM golang:1.27-alpine AS build
 ARG TARGETOS TARGETARCH
 WORKDIR /src
 COPY go.mod go.sum ./

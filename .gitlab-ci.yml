@@ -2,6 +2,17 @@ include:
   - project: 'sharkops/gitlab-ci-common-config'
     ref: master
     file: 'docker/build.yml'
+  # lint + test. Extracted 2026-08-24 - this repo and four sibling exporters
+  # carried byte-identical copies, which had already drifted (exporter-common
+  # hardcoded golang:1.26 while the rest used ${GO_VERSION}).
+  - project: 'sharkops/gitlab-ci-common-config'
+    ref: master
+    file: 'go/ci.yml'
+  # promtool validation of examples/rules.yaml. The entrypoint override and the
+  # `exists:` guard both live in the template now.
+  - project: 'sharkops/gitlab-ci-common-config'
+    ref: master
+    file: 'prometheus/rules.yml'
 
 # The included template's jobs (build, build_release) both declare
 # `stage: build`. It supplies no `stages:` list of its own, so this project
@@ -9,7 +20,6 @@ include:
 stages: [test, rules, build]
 
 variables:
-  GO_VERSION: "1.26"
   # docker/build.yml (sharkops/gitlab-ci-common-config) builds with Kaniko —
   # no Docker-in-Docker. It is single-arch: whatever platform the Kaniko
   # executor itself runs on (amd64 on this org's shared runners). The
@@ -20,38 +30,3 @@ variables:
   REGISTRY_USER: $CI_REGISTRY_USER
   REGISTRY_PASSWORD: $CI_REGISTRY_PASSWORD
   IMAGE_NAME: $CI_REGISTRY_IMAGE
-
-# Pinned, not :latest. golangci-lint refuses to run when the Go version it was
-# built with is older than the one go.mod targets, so :latest turns a routine
-# upstream release into a red pipeline on an unchanged commit — and, the other
-# way round, silently changes the enabled linter set under you. The linter set
-# itself lives in .golangci.yml so this image and a contributor's local run
-# agree. Bump this tag together with GO_VERSION and go.mod's `go` directive.
-lint:
-  stage: test
-  image: golangci/golangci-lint:v2.12.2
-  script:
-    - golangci-lint run --timeout 5m
-
-test:
-  stage: test
-  image: golang:${GO_VERSION}
-  script:
-    - go test ./... -race -count=1
-
-# promtool runs against the shipped example rules. This needs no cluster:
-# `promtool test rules` synthesises its own series.
-#
-# prom/prometheus's default ENTRYPOINT is the `prometheus` binary itself,
-# which rejects `promtool` as an unknown argument if invoked as `prometheus
-# promtool ...` — hence the entrypoint override so `script:` can call
-# `promtool` directly.
-rules:
-  stage: rules
-  image:
-    name: prom/prometheus:latest
-    entrypoint: [""]
-  script:
-    - cd examples
-    - promtool check rules rules.yaml
-    - promtool test rules rules_test.yaml

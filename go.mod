@@ -5,7 +5,7 @@ go 1.26.5
 require (
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/prometheus/client_golang v1.25.0
-	github.com/prometheus/prometheus v0.315.0
+	github.com/prometheus/prometheus v0.315.1
 	gitlab.com/sharkops/exporters/exporter-common v0.2.0
 )
 

@@ -13,8 +13,8 @@ import (
 
 	"github.com/prometheus/prometheus/promql/parser"
 
-	"gitlab.com/sharkops/exporters/unas-protect-exporter/internal/protect"
-	"gitlab.com/sharkops/exporters/unas-protect-exporter/internal/unas"
+	"github.com/sharkops-io/unas-protect-exporter/internal/protect"
+	"github.com/sharkops-io/unas-protect-exporter/internal/unas"
 )
 
 // promqlParser is the parser instance used throughout this file. This

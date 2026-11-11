@@ -299,17 +299,14 @@ the Deployment name this exporter is typically installed under is doubled
 docker build -t unas-protect-exporter:local .
 ```
 
-CI builds and pushes the image with
-[Kaniko](https://github.com/GoogleContainerTools/kaniko) via the shared
-`sharkops/gitlab-ci-common-config` `docker/build.yml` template — no
-Docker-in-Docker. That builder is **single-architecture**: it produces
-whatever platform the Kaniko executor itself runs on (`linux/amd64` on this
-org's shared runners), not the `linux/amd64,linux/arm64` multi-arch manifest
-a `docker buildx` pipeline could produce. This is an accepted trade for this
-deployment — the target cluster is amd64-only — but is worth knowing if this
-image is ever pulled onto arm64 hardware (e.g. a Raspberry Pi or Apple
-Silicon dev machine): it won't run there without a local `docker build`.
+CI builds the image with Docker Buildx through the shared
+[`image.yml`](https://github.com/sharkops-io/.github/blob/main/.github/workflows/image.yml)
+workflow and pushes it to `ghcr.io/sharkops-io/unas-protect-exporter`: `:main` and
+`:sha-*` from `main`, `:vX.Y.Z` and `:latest` from a release tag. It builds
+`linux/amd64` only, which matches the target cluster; an arm64 host needs a
+local `docker build`.
 
 ## License
 
-MIT. See `LICENSE`.
+
+Apache License 2.0. See [LICENSE](LICENSE).

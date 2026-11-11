@@ -12,11 +12,12 @@ docker build -t unas-protect-exporter:test .
 docker run --rm unas-protect-exporter:test --help
 ```
 
-The linter set lives in `.golangci.yml`, and `.gitlab-ci.yml` pins the image
-tag. If your local `golangci-lint` disagrees with CI, match the pinned version
+The linter set lives in `.golangci.yml`, and the shared
+[`go.yml`](https://github.com/sharkops-io/.github/blob/main/.github/workflows/go.yml)
+workflow pins the image tag (`golangci-lint-version`). If your local `golangci-lint` disagrees with CI, match the pinned version
 rather than editing the config — and note that golangci-lint refuses to run at
 all when it was built against an older Go than `go.mod` targets, so the pin,
-`GO_VERSION` and the `go` directive move together.
+`go-version` and the `go` directive move together.
 
 `go test` covers, among other things:
 
@@ -25,7 +26,7 @@ all when it was built against an older Go than `go.mod` targets, so the pin,
 - Collector isolation, at two levels. The registry's view — a failing,
   panicking or duplicate-emitting collector must not cost another collector
   its series — is covered by `collector` in the shared
-  [`exporter-common`](https://gitlab.com/sharkops/exporters/exporter-common)
+  [`exporter-common`](https://github.com/sharkops-io/exporter-common)
   module, which is where that package now lives. This repo still owns the half
   that only it can test: `cmd/unas-protect-exporter/main_test.go` covers the
   same property where it actually has to hold — a real GET against `/metrics`,

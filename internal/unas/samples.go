@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"gitlab.com/sharkops/exporters/exporter-common/metric"
+	"github.com/sharkops-io/exporter-common/metric"
 )
 
 // Samples maps a storage payload onto the metric set. Pure, with now

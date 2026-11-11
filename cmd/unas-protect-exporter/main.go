@@ -13,10 +13,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"gitlab.com/sharkops/exporters/exporter-common/collector"
-	"gitlab.com/sharkops/exporters/unas-protect-exporter/internal/config"
-	"gitlab.com/sharkops/exporters/unas-protect-exporter/internal/protect"
-	"gitlab.com/sharkops/exporters/unas-protect-exporter/internal/unas"
+	"github.com/sharkops-io/exporter-common/collector"
+	"github.com/sharkops-io/unas-protect-exporter/internal/config"
+	"github.com/sharkops-io/unas-protect-exporter/internal/protect"
+	"github.com/sharkops-io/unas-protect-exporter/internal/unas"
 )
 
 // version is overridden at build time via -ldflags "-X main.version=...".

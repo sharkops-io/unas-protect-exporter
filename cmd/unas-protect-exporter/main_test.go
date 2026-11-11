@@ -10,8 +10,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"gitlab.com/sharkops/exporters/unas-protect-exporter/internal/config"
-	"gitlab.com/sharkops/exporters/unas-protect-exporter/internal/protect"
+	"github.com/sharkops-io/unas-protect-exporter/internal/config"
+	"github.com/sharkops-io/unas-protect-exporter/internal/protect"
 )
 
 // The end-to-end tests below are the only ones that exercise config → clients

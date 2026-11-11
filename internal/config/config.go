@@ -7,10 +7,10 @@ import (
 
 	"github.com/alecthomas/kingpin/v2"
 
-	common "gitlab.com/sharkops/exporters/exporter-common/config"
+	common "github.com/sharkops-io/exporter-common/config"
 
-	"gitlab.com/sharkops/exporters/unas-protect-exporter/internal/protect"
-	"gitlab.com/sharkops/exporters/unas-protect-exporter/internal/unas"
+	"github.com/sharkops-io/unas-protect-exporter/internal/protect"
+	"github.com/sharkops-io/unas-protect-exporter/internal/unas"
 )
 
 // ErrHelpRequested is re-exported so callers need not import the shared

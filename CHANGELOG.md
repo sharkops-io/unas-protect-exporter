@@ -84,7 +84,7 @@ in `CONTRIBUTING.md` — a renamed or removed metric name is a breaking change.
 ### Changed
 
 - `httpx`, `metric`, `collector` and `testutil` now come from the shared
-  [`exporter-common`](https://gitlab.com/sharkops/exporters/exporter-common)
+  [`exporter-common`](https://github.com/sharkops-io/exporter-common)
   module (v0.1.0) rather than living under `internal/`. Those four packages
   were originally extracted *from* this repo to build `gameserver-exporter`;
   this closes the loop so there is one copy rather than two drifting ones.

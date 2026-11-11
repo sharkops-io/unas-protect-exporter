@@ -1,4 +1,4 @@
-module gitlab.com/sharkops/exporters/unas-protect-exporter
+module github.com/sharkops-io/unas-protect-exporter
 
 go 1.26.7
 
@@ -6,7 +6,7 @@ require (
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/prometheus/client_golang v1.25.0
 	github.com/prometheus/prometheus v0.316.0
-	gitlab.com/sharkops/exporters/exporter-common v0.2.0
+	github.com/sharkops-io/exporter-common v0.3.0
 )
 
 require (
@@ -17,8 +17,9 @@ require (
 	github.com/grafana/regexp v0.0.0-20250905093917-f7b3be9d1853 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
+	github.com/pandatix/go-abnf v0.5.3 // indirect
 	github.com/prometheus/client_model v0.6.3 // indirect
-	github.com/prometheus/common v0.72.1 // indirect
+	github.com/prometheus/common v0.73.1 // indirect
 	github.com/prometheus/procfs v0.22.0 // indirect
 	github.com/xhit/go-str2duration/v2 v2.1.0 // indirect
 	go.uber.org/atomic v1.12.0 // indirect

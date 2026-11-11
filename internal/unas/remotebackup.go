@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"gitlab.com/sharkops/exporters/exporter-common/metric"
-	"gitlab.com/sharkops/exporters/unas-protect-exporter/internal/unifios"
+	"github.com/sharkops-io/exporter-common/metric"
+	"github.com/sharkops-io/unas-protect-exporter/internal/unifios"
 )
 
 // remoteBackupPath serves the UNAS's "remote backup" jobs — the scheduled

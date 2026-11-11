@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"gitlab.com/sharkops/exporters/unas-protect-exporter/internal/unifios"
+	"github.com/sharkops-io/unas-protect-exporter/internal/unifios"
 )
 
 const bootstrapPath = "/proxy/protect/api/bootstrap"

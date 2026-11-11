@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	"gitlab.com/sharkops/exporters/exporter-common/httpx"
+	"github.com/sharkops-io/exporter-common/httpx"
 )
 
 // Session holds one authenticated UniFi OS console session.

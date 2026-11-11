@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"gitlab.com/sharkops/exporters/exporter-common/metric"
-	"gitlab.com/sharkops/exporters/unas-protect-exporter/internal/protect"
-	"gitlab.com/sharkops/exporters/unas-protect-exporter/internal/unas"
+	"github.com/sharkops-io/exporter-common/metric"
+	"github.com/sharkops-io/unas-protect-exporter/internal/protect"
+	"github.com/sharkops-io/unas-protect-exporter/internal/unas"
 )
 
 type row struct {

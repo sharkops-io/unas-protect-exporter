@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"gitlab.com/sharkops/exporters/exporter-common/httpx"
+	"github.com/sharkops-io/exporter-common/httpx"
 )
 
 // osServer serves the UniFi OS login shape. authOK flips to make /data return

@@ -12,11 +12,11 @@ import (
 	"github.com/sharkops-io/exporter-common/httpx"
 )
 
-// Config is the exporter's UNAS connection config. Unlike another-app' version
-// this has no JSON tags and no pointer-bool: that pointer existed so a config
-// row saved before the field was added still meant "verify". Flags have no
-// such history, and the flag itself is phrased negatively, so a plain bool
-// whose zero value means "verify" is correct here.
+// Config is the exporter's UNAS connection config. Unlike the earlier client
+// it was ported from, this has no JSON tags and no pointer-bool: that pointer
+// existed so a config row saved before the field was added still meant
+// "verify". Flags have no such history, and the flag itself is phrased
+// negatively, so a plain bool whose zero value means "verify" is correct here.
 type Config struct {
 	URL    string
 	APIKey string

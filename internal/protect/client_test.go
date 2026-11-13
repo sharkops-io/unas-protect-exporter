@@ -126,17 +126,17 @@ func TestDecodeBridges(t *testing.T) {
 	if len(bs.Bridges) != 2 {
 		t.Fatalf("bridges = %d, want 2", len(bs.Bridges))
 	}
-	var basement *Bridge
+	var bridge1 *Bridge
 	for i := range bs.Bridges {
 		if bs.Bridges[i].Name == "Example Bridge 1" {
-			basement = &bs.Bridges[i]
+			bridge1 = &bs.Bridges[i]
 		}
 	}
-	if basement == nil {
+	if bridge1 == nil {
 		t.Fatal("Example Bridge 1 not found")
 	}
-	if basement.IsConnected || basement.State != "CONNECTING" {
-		t.Errorf("Example Bridge 1 = %+v, want disconnected/CONNECTING", basement)
+	if bridge1.IsConnected || bridge1.State != "CONNECTING" {
+		t.Errorf("Example Bridge 1 = %+v, want disconnected/CONNECTING", bridge1)
 	}
 }
 

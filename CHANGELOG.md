@@ -8,6 +8,14 @@ in `CONTRIBUTING.md` — a renamed or removed metric name is a breaking change.
 
 ## [Unreleased]
 
+### Added
+
+- **Disk I/O row in `dashboards/unas.json`.** Total disk read/write
+  throughput, device network receive/transmit, and per-slot read and write
+  graphs, built from `unas_disk_read_kbps`, `unas_disk_write_kbps`,
+  `unas_network_receive_kbps` and `unas_network_transmit_kbps`. These series
+  were already exported but no panel showed them.
+
 ## [0.2.0] - 2026-08-13
 
 ### Added

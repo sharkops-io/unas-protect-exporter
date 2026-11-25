@@ -643,6 +643,273 @@
       ]
     },
     {
+      "id": 24,
+      "type": "row",
+      "title": "Disk I/O",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 15
+      },
+      "panels": []
+    },
+    {
+      "id": 25,
+      "type": "timeseries",
+      "title": "Disk throughput (all disks)",
+      "description": "Summed over every disk, as the device reports it. On a parity RAID, small writes make each disk read old data and parity before writing, so reads and writes rising together while network traffic stays low usually means many small writes, not large transfers. Compare with Network throughput.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "KBs",
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": true
+          },
+          "color": {
+            "mode": "palette-classic-by-name"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(max by (slot) (unas_disk_read_kbps))",
+          "legendFormat": "read",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(max by (slot) (unas_disk_write_kbps))",
+          "legendFormat": "write",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "id": 26,
+      "type": "timeseries",
+      "title": "Network throughput",
+      "description": "Traffic the device sends and receives on all interfaces. Receive is data clients are writing to it; transmit is data clients are reading.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "KBs",
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": true
+          },
+          "color": {
+            "mode": "palette-classic-by-name"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max by (device) (unas_network_receive_kbps)",
+          "legendFormat": "receive (writes in)",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max by (device) (unas_network_transmit_kbps)",
+          "legendFormat": "transmit (reads out)",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "id": 27,
+      "type": "timeseries",
+      "title": "Read by slot",
+      "description": "Per-disk read throughput.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "KBs",
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": true
+          },
+          "color": {
+            "mode": "palette-classic-by-name"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max by (slot) (unas_disk_read_kbps)",
+          "legendFormat": "slot {{slot}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 28,
+      "type": "timeseries",
+      "title": "Write by slot",
+      "description": "Per-disk write throughput.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "KBs",
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": true
+          },
+          "color": {
+            "mode": "palette-classic-by-name"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max by (slot) (unas_disk_write_kbps)",
+          "legendFormat": "slot {{slot}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
       "id": 10,
       "type": "row",
       "title": "Trends",
@@ -651,7 +918,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 15
+        "y": 32
       },
       "panels": []
     },
@@ -667,7 +934,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 16
+        "y": 33
       },
       "fieldConfig": {
         "defaults": {
@@ -731,7 +998,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 16
+        "y": 33
       },
       "fieldConfig": {
         "defaults": {
@@ -787,7 +1054,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 16
+        "y": 33
       },
       "fieldConfig": {
         "defaults": {
@@ -848,7 +1115,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 24
+        "y": 41
       },
       "panels": []
     },
@@ -864,7 +1131,7 @@
         "h": 6,
         "w": 3,
         "x": 0,
-        "y": 25
+        "y": 42
       },
       "fieldConfig": {
         "defaults": {
@@ -919,7 +1186,7 @@
         "h": 6,
         "w": 3,
         "x": 3,
-        "y": 25
+        "y": 42
       },
       "fieldConfig": {
         "defaults": {
@@ -974,7 +1241,7 @@
         "h": 6,
         "w": 3,
         "x": 6,
-        "y": 25
+        "y": 42
       },
       "fieldConfig": {
         "defaults": {
@@ -1029,7 +1296,7 @@
         "h": 6,
         "w": 3,
         "x": 9,
-        "y": 25
+        "y": 42
       },
       "fieldConfig": {
         "defaults": {
@@ -1084,7 +1351,7 @@
         "h": 6,
         "w": 3,
         "x": 12,
-        "y": 25
+        "y": 42
       },
       "fieldConfig": {
         "defaults": {
@@ -1139,7 +1406,7 @@
         "h": 6,
         "w": 3,
         "x": 15,
-        "y": 25
+        "y": 42
       },
       "fieldConfig": {
         "defaults": {
@@ -1194,7 +1461,7 @@
         "h": 6,
         "w": 3,
         "x": 18,
-        "y": 25
+        "y": 42
       },
       "fieldConfig": {
         "defaults": {
@@ -1246,7 +1513,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 31
+        "y": 48
       },
       "panels": []
     },
@@ -1262,7 +1529,7 @@
         "h": 4,
         "w": 12,
         "x": 0,
-        "y": 32
+        "y": 49
       },
       "options": {
         "reduceOptions": {
@@ -1328,7 +1595,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 36
+        "y": 53
       },
       "panels": []
     },
@@ -1344,7 +1611,7 @@
         "h": 4,
         "w": 4,
         "x": 0,
-        "y": 37
+        "y": 54
       },
       "options": {
         "reduceOptions": {
@@ -1414,7 +1681,7 @@
         "h": 6,
         "w": 10,
         "x": 4,
-        "y": 37
+        "y": 54
       },
       "fieldConfig": {
         "defaults": {
@@ -1469,7 +1736,7 @@
         "h": 6,
         "w": 10,
         "x": 14,
-        "y": 37
+        "y": 54
       },
       "fieldConfig": {
         "defaults": {
@@ -1524,7 +1791,7 @@
         "h": 6,
         "w": 12,
         "x": 0,
-        "y": 43
+        "y": 60
       },
       "fieldConfig": {
         "defaults": {
@@ -1579,7 +1846,7 @@
         "h": 6,
         "w": 12,
         "x": 12,
-        "y": 43
+        "y": 60
       },
       "fieldConfig": {
         "defaults": {
@@ -1633,7 +1900,7 @@
         "h": 6,
         "w": 8,
         "x": 0,
-        "y": 49
+        "y": 66
       },
       "fieldConfig": {
         "defaults": {
@@ -1687,7 +1954,7 @@
         "h": 6,
         "w": 8,
         "x": 8,
-        "y": 49
+        "y": 66
       },
       "fieldConfig": {
         "defaults": {
@@ -1741,7 +2008,7 @@
         "h": 6,
         "w": 8,
         "x": 16,
-        "y": 49
+        "y": 66
       },
       "fieldConfig": {
         "defaults": {
@@ -1793,7 +2060,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 55
+        "y": 72
       },
       "datasource": {
         "type": "prometheus",
@@ -1812,7 +2079,7 @@
         "h": 5,
         "w": 5,
         "x": 0,
-        "y": 56
+        "y": 73
       },
       "description": "Anything above 0 means the remote credential has expired: the task stays configured and enabled, and nothing is being written to the destination. This is how an offsite backup dies silently.",
       "fieldConfig": {
@@ -1872,7 +2139,7 @@
         "h": 5,
         "w": 5,
         "x": 5,
-        "y": 56
+        "y": 73
       },
       "description": "Count of error codes across all tasks' last runs. A count rather than a status string, so it needs no knowledge of how the device spells its failure states.",
       "fieldConfig": {
@@ -1932,7 +2199,7 @@
         "h": 5,
         "w": 5,
         "x": 10,
-        "y": 56
+        "y": 73
       },
       "description": "A task whose schedule has been switched off. Not necessarily wrong, but it will never run again and nothing else reports that.",
       "fieldConfig": {
@@ -1992,7 +2259,7 @@
         "h": 10,
         "w": 9,
         "x": 15,
-        "y": 56
+        "y": 73
       },
       "description": "Sawtooth is healthy - each nightly run resets it. A line that climbs without resetting is a task that has stopped running. Aggregated by task: without it the scrape labels (pod, instance, container, endpoint) ride along and a pod restart draws a second line per task.",
       "fieldConfig": {
@@ -2057,7 +2324,7 @@
         "h": 5,
         "w": 15,
         "x": 0,
-        "y": 61
+        "y": 78
       },
       "description": "How long each task's last run took. Worth watching for creep: the longhorn task already runs over three hours. Aggregated by task: without it the scrape labels (pod, instance, container, endpoint) ride along and a pod restart draws a second line per task.",
       "fieldConfig": {
